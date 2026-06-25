@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
 import StatusBadge from '../../components/common/StatusBadge'
+import { useNavigate } from 'react-router-dom'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -56,6 +57,7 @@ const PATIENT_QUEUE = [
 function DoctorDashboard() {
   const { user } = useAuth()
   const [activeLink, setActiveLink] = useState("Dashboard")
+const navigate = useNavigate()
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -126,9 +128,12 @@ function DoctorDashboard() {
                     <td className="py-3 text-gray-600 max-w-48">{p.complaint}</td>
                     <td className="py-3"><StatusBadge status={p.status} /></td>
                     <td className="py-3">
-                      <button className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700 transition">
-                        Open Case
-                      </button>
+                    <button
+                    onClick={() => navigate(`/doctor/consultation/${p.token}`)}
+                    className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700 transition"
+                    >
+                    Open Case
+                    </button>
                     </td>
                   </tr>
                 ))}
