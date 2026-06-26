@@ -10,7 +10,9 @@ import PatientConsultation from './pages/doctor/PatientConsultation'
 // Lab pages
 import LabDashboard from './pages/lab/LabDashboard'
 import TestOrder from './pages/lab/TestOrder'
-
+import SampleCollection from './pages/lab/SampleCollection'
+import ResultEntry from './pages/lab/ResultEntry'
+import ReportsManagement from './pages/lab/ReportsManagement'
 function App() {
   return (
     <BrowserRouter>
@@ -29,7 +31,21 @@ function App() {
             <PatientConsultation />
           </ProtectedRoute>
         }/>
-
+<Route path="/lab/sample-collection" element={
+  <ProtectedRoute allowedRole="lab">
+    <SampleCollection />
+  </ProtectedRoute>
+}/>
+<Route path="/lab/result-entry" element={
+  <ProtectedRoute allowedRole="lab">
+    <ResultEntry />
+  </ProtectedRoute>
+}/>
+<Route path="/lab/reports" element={
+  <ProtectedRoute allowedRole="lab">
+    <ReportsManagement />
+  </ProtectedRoute>
+}/>
         {/* Lab module */}
         <Route path="/lab" element={
           <ProtectedRoute allowedRole="lab">
