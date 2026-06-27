@@ -9,6 +9,8 @@ const FAKE_USERS = [
   { id: 3, name: 'Meena Pillai', role: 'nurse',        token: 'fake-token-nurse'  },
   { id: 4, name: 'Raj Mehta',    role: 'pharmacy',     token: 'fake-token-pharma' },
   { id: 5, name: 'Vijay Srinivas',role: 'lab',         token: 'fake-token-lab'    },
+  { id: 6, name: 'Super Admin', role: 'admin', token: 'fake-token-admin' }
+
 ]
 
 const ROLE_ROUTES = {
@@ -17,6 +19,8 @@ const ROLE_ROUTES = {
   nurse:        '/nurse',
   pharmacy:     '/pharmacy',
   lab:          '/lab',
+  admin: '/admin'
+
 }
 
 function Login() {
@@ -60,6 +64,8 @@ function Login() {
             <option value="nurse">Nurse</option>
             <option value="pharmacy">Pharmacist</option>
             <option value="lab">Lab Technician</option>
+            <option value="admin">Admin</option>
+
           </select>
         </div>
 

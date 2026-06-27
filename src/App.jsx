@@ -32,6 +32,12 @@ import SampleCollection from './pages/lab/SampleCollection'
 import ResultEntry from './pages/lab/ResultEntry'
 import ReportsManagement from './pages/lab/ReportsManagement'
 
+//admin pages
+import AdminDashboard from './pages/admin/AdminDashboard'
+import IPManagement from './pages/admin/IPManagement'
+import Doctors from './pages/admin/Doctors'
+import Staff from './pages/admin/Staff'
+
 function App() {
   return (
     <BrowserRouter>
@@ -153,7 +159,26 @@ function App() {
             <TestOrder />
           </ProtectedRoute>
         }/>
-
+<Route path="/admin" element={
+  <ProtectedRoute allowedRole="admin">
+    <AdminDashboard />
+  </ProtectedRoute>
+} />
+<Route path="/admin/ip" element={
+  <ProtectedRoute allowedRole="admin">
+    <IPManagement />
+  </ProtectedRoute>
+} />
+<Route path="/admin/doctors" element={
+  <ProtectedRoute allowedRole="admin">
+    <Doctors />
+  </ProtectedRoute>
+} />
+<Route path="/admin/staff" element={
+  <ProtectedRoute allowedRole="admin">
+    <Staff />
+  </ProtectedRoute>
+} />
 
       </Routes>
     </BrowserRouter>

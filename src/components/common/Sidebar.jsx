@@ -32,6 +32,19 @@ const NAV_ICONS = {
   "Prescription Queue": "📜",
   "Dispense Medicine": "💉",
   "Billing": "🧾",
+  // Admin"Patients":      "👥",
+"Appointments":  "📆",
+"Doctors":       "👨‍⚕️",
+"Staff":         "🧑‍💼",
+"OP":            "🏥",
+"IP":            "🛏️",
+"Prescriptions": "💊",
+"Pharmacy":      "🗃️",
+"Laboratory":    "🧪",
+"Vehicles":      "🚑",
+"Finance":       "💰",
+"Follow-ups":    "📞",
+"Reports":       "📊",
 }
 
 const ROLE_LABELS = {
