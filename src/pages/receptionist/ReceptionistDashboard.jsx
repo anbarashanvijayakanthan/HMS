@@ -53,6 +53,12 @@ function ReceptionistDashboard() {
 
   const handleNavClick = (link) => {
     setActiveLink(link)
+    if (link === "Patient Management")     navigate('/receptionist/patients')
+    if (link === "Patient Registration")   navigate('/receptionist/registration')
+    if (link === "Appointment Management") navigate('/receptionist/appointments')
+    if (link === "Queue Management")       navigate('/receptionist/queue')
+    if (link === "Billing Collection")     navigate('/receptionist/billing')
+    if (link === "Follow-up Management")   navigate('/receptionist/followup')
   }
 
   const filtered = APPOINTMENTS.filter(a =>
