@@ -1,39 +1,47 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
+import { useVisit, useFollowUps } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard", "Patient Consultation", "Diagnosis",
   "Prescription", "Lab Order", "Radiology Order", "Follow-up Manager",
 ]
 
+let fuCounter = 1 // demo-only incrementing id
+
 function FollowUpManager() {
   const { token } = useParams()
   const navigate  = useNavigate()
+  const { user }  = useAuth()
   const [activeLink, setActiveLink] = useState("Follow-up Manager")
+
+  // ── Shared store ──
+  const { visit, patient } = useVisit(token)
+  const { followUps, createFollowUp, updateStatus } = useFollowUps()
 
   // Form state
   const [purpose,      setPurpose]      = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
   const [instructions, setInstructions] = useState('')
 
-  // Follow-up list
-  const [followUps, setFollowUps] = useState([
-    { patient: "Sneha Patel",  lastVisit: "19 Jun", date: "19 Jul 2025", purpose: "BP Review + Lab results",      },
-    { patient: "Arjun Mehta",  lastVisit: "12 Jun", date: "26 Jun 2025", purpose: "Holter monitor review",        },
-    { patient: "Rajesh Verma", lastVisit: "15 Jun", date: "22 Jun 2025", purpose: "Medication response check",    },
-  ])
-
   const handleSchedule = () => {
-    if (!purpose || !followUpDate) return
-    setFollowUps(prev => [{
-      patient: "Sneha Patel",
-      lastVisit: "19 Jun",
+    if (!purpose || !followUpDate || !patient) return
+    fuCounter += 1
+    createFollowUp({
+      id: `FU-${fuCounter}`,
+      patientId: patient.id,
+      token,
+      doctor: `Dr. ${user?.name}`,
+      purpose,
+      instructions,
       date: new Date(followUpDate).toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric'
       }),
-      purpose,
-    }, ...prev])
+      lastVisit: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+      status: "Scheduled",
+    })
     setPurpose(''); setFollowUpDate(''); setInstructions('')
   }
 
@@ -45,6 +53,17 @@ function FollowUpManager() {
     if (link === "Prescription")         navigate(`/doctor/prescription/${token}`)
     if (link === "Lab Order")            navigate(`/doctor/lab-order/${token}`)
     if (link === "Radiology Order")      navigate(`/doctor/radiology-order/${token}`)
+  }
+
+  if (!patient || !visit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <p className="text-gray-500">No patient found for token "{token}".</p>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -61,7 +80,9 @@ function FollowUpManager() {
             {" › "}Follow-up Management
           </p>
           <h2 className="text-2xl font-bold text-gray-800">Follow-up Management</h2>
-          <p className="text-sm text-gray-400">Schedule and review patient follow-ups</p>
+          <p className="text-sm text-gray-400">
+            {patient.name} · {patient.id} · Schedule and review patient follow-ups
+          </p>
         </div>
 
         <div className="flex flex-col gap-5 max-w-4xl">
@@ -72,19 +93,17 @@ function FollowUpManager() {
 
             <div className="grid grid-cols-2 gap-4 mb-4">
 
-              {/* Patient — prefilled */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Patient
                 </label>
                 <input
-                  value="Current: Sneha Patel"
+                  value={`Current: ${patient.name}`}
                   disabled
                   className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
                 />
               </div>
 
-              {/* Follow-up Purpose */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Follow-up Purpose *
@@ -97,7 +116,6 @@ function FollowUpManager() {
                 />
               </div>
 
-              {/* Follow-up Date */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Follow-up Date *
@@ -111,7 +129,6 @@ function FollowUpManager() {
                 />
               </div>
 
-              {/* Instructions */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Instructions for Patient
@@ -137,31 +154,34 @@ function FollowUpManager() {
             </div>
           </div>
 
-          {/* Follow-up Schedule Table */}
+          {/* Follow-up Schedule Table — real data, all patients (this doctor's + others) */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="font-semibold text-gray-700 mb-4">Follow-up Schedule</h3>
+            <h3 className="font-semibold text-gray-700 mb-4">All Scheduled Follow-ups</h3>
 
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400 border-b border-gray-100 uppercase text-xs">
-                  <th className="pb-3 font-medium">Patient</th>
-                  <th className="pb-3 font-medium">Last Visit</th>
+                  <th className="pb-3 font-medium">Patient ID</th>
                   <th className="pb-3 font-medium">Follow-up Date</th>
                   <th className="pb-3 font-medium">Purpose</th>
+                  <th className="pb-3 font-medium">Status</th>
                   <th className="pb-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {followUps.map((f, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-3 font-medium text-blue-600">{f.patient}</td>
-                    <td className="py-3 text-gray-500">{f.lastVisit}</td>
+                {followUps.map((f) => (
+                  <tr key={f.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-3 font-medium text-blue-600">{f.patientId}</td>
                     <td className="py-3">
                       <span className="font-medium text-gray-800">{f.date}</span>
                     </td>
                     <td className="py-3 text-gray-600">{f.purpose}</td>
+                    <td className="py-3 text-gray-500 text-xs">{f.status}</td>
                     <td className="py-3">
-                      <button className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                      <button
+                        onClick={() => updateStatus(f.id, "Rescheduled")}
+                        className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+                      >
                         📅 Reschedule
                       </button>
                     </td>

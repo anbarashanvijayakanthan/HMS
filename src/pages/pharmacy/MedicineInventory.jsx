@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
+import { useMedicines } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -13,15 +14,6 @@ const NAV_LINKS = [
   "Billing",
 ]
 
-const MEDICINES = [
-  { name: "Metoprolol Succinate 25mg", generic: "Metoprolol",  category: "Tablet", stock: 12,  batch: "MT-2025-04", expiry: "Dec 2026", price: 85,  reorderLevel: 50,  status: "Low Stock"    },
-  { name: "Amlodipine 5mg",            generic: "Amlodipine",  category: "Tablet", stock: 8,   batch: "AM-2025-03", expiry: "Oct 2025", price: 42,  reorderLevel: 100, status: "Low Stock"    },
-  { name: "Atorvastatin 10mg",         generic: "Atorvastatin",category: "Tablet", stock: 240, batch: "AT-2025-05", expiry: "Mar 2027", price: 95,  reorderLevel: 50,  status: "In Stock"     },
-  { name: "Azithromycin 500mg",        generic: "Azithromycin",category: "Tablet", stock: 180, batch: "AZ-2025-02", expiry: "Aug 2026", price: 110, reorderLevel: 30,  status: "In Stock"     },
-  { name: "Paracetamol 500mg",         generic: "Paracetamol", category: "Tablet", stock: 45,  batch: "PC-2025-06", expiry: "Sep 2025", price: 18,  reorderLevel: 200, status: "Expiring Soon" },
-  { name: "Ondansetron 4mg",           generic: "Ondansetron", category: "Tablet", stock: 0,   batch: "—",          expiry: "—",         price: 72,  reorderLevel: 50,  status: "Out of Stock"  },
-]
-
 const STATUS_STYLES = {
   "In Stock":     "bg-green-100 text-green-700",
   "Low Stock":    "bg-yellow-100 text-yellow-700",
@@ -29,11 +21,24 @@ const STATUS_STYLES = {
   "Out of Stock": "bg-red-100 text-red-700",
 }
 
+// Derive live status from stock vs reorderLevel rather than trusting a
+// stored field — this way it's always correct even after DECREMENT_STOCK
+// or a freshly-added medicine changes the numbers.
+function deriveStatus(m) {
+  if (m.stock === 0) return "Out of Stock"
+  if (m.stock < m.reorderLevel) return "Low Stock"
+  if (m.status === "Expiring Soon") return "Expiring Soon" // seed data flag, no expiry-date math yet
+  return "In Stock"
+}
+
 function MedicineInventory() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Medicine Inventory")
   const [search, setSearch] = useState("")
+
+  // ── Shared store ──
+  const { medicines } = useMedicines()
 
   const handleNavClick = (link) => {
     setActiveLink(link)
@@ -45,15 +50,17 @@ function MedicineInventory() {
     if (link === "Medicine Inventory") navigate('/pharmacy/inventory')
   }
 
-  const filtered = MEDICINES.filter(m =>
+  const enriched = medicines.map(m => ({ ...m, liveStatus: deriveStatus(m) }))
+
+  const filtered = enriched.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.generic.toLowerCase().includes(search.toLowerCase())
+    (m.generic || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const totalItems   = MEDICINES.length
-  const inStockCount  = MEDICINES.filter(m => m.status === "In Stock").length
-  // Note: counts below mirror the screenshot's totals (482/451/14/7), not derived
-  // from this small mock list — wire these to real aggregate values from the API later.
+  const totalItems      = medicines.length
+  const inStockCount    = enriched.filter(m => m.liveStatus === "In Stock").length
+  const lowStockCount   = enriched.filter(m => m.liveStatus === "Low Stock").length
+  const expiringCount   = enriched.filter(m => m.liveStatus === "Expiring Soon").length
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -80,12 +87,12 @@ function MedicineInventory() {
           </div>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row — now derived from real store data */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="📦" label="Total Items"    value={482} />
-          <StatsCard icon="✅" label="In Stock"        value={451} />
-          <StatsCard icon="⚠️" label="Low Stock"       value={14} subColor="text-yellow-500" />
-          <StatsCard icon="⛔" label="Expiring Soon"   value={7}  subColor="text-red-500" />
+          <StatsCard icon="📦" label="Total Items"    value={totalItems} />
+          <StatsCard icon="✅" label="In Stock"        value={inStockCount} />
+          <StatsCard icon="⚠️" label="Low Stock"       value={lowStockCount} subColor="text-yellow-500" />
+          <StatsCard icon="⛔" label="Expiring Soon"   value={expiringCount}  subColor="text-red-500" />
         </div>
 
         {/* Inventory Table */}
@@ -122,7 +129,7 @@ function MedicineInventory() {
               </thead>
               <tbody>
                 {filtered.map((m, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <tr key={`${m.name}-${i}`} className="border-b border-gray-50 hover:bg-gray-50 transition">
                     <td className="py-3 font-medium text-gray-800">{m.name}</td>
                     <td className="py-3 text-gray-400">{m.generic}</td>
                     <td className="py-3">
@@ -132,14 +139,14 @@ function MedicineInventory() {
                       {m.stock}
                     </td>
                     <td className="py-3 text-gray-500 text-xs">{m.batch}</td>
-                    <td className={`py-3 text-xs ${m.status === "Expiring Soon" ? "text-orange-500 font-medium" : "text-gray-500"}`}>
+                    <td className={`py-3 text-xs ${m.liveStatus === "Expiring Soon" ? "text-orange-500 font-medium" : "text-gray-500"}`}>
                       {m.expiry}
                     </td>
                     <td className="py-3 text-gray-700">₹{m.price}</td>
                     <td className="py-3 text-gray-500">{m.reorderLevel}</td>
                     <td className="py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[m.status] || "bg-gray-100 text-gray-600"}`}>
-                        {m.status}
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[m.liveStatus] || "bg-gray-100 text-gray-600"}`}>
+                        {m.liveStatus}
                       </span>
                     </td>
                     <td className="py-3 text-right whitespace-nowrap">
@@ -148,6 +155,13 @@ function MedicineInventory() {
                     </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-8 text-center text-gray-400 text-sm">
+                      No medicines found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

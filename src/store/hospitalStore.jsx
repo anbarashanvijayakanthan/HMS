@@ -1,5 +1,4 @@
-import { createContext, useContext, useReducer } from 'react'
-
+import { createContext, useContext, useReducer, useEffect } from 'react'
 // ─────────────────────────────────────────────────────────────────────────
 // SEED DATA
 // Merged from every role's mock data — one consistent shape per entity,
@@ -69,7 +68,10 @@ const SEED_QUEUE = [
   { token: "T-011", patientId: "P-1008", department: "General", checkIn: "10:10 AM", status: "With Nurse", priority: "Normal", complaint: "SpO2 below threshold", lastUpdated: "11:00 AM" },
   { token: "T-012", patientId: "P-1007", department: "Neuro", checkIn: "10:20 AM", status: "Waiting", priority: "Normal", complaint: "Knee pain, post-op review", lastUpdated: "10:20 AM" },
 ]
-
+const SEED_APPOINTMENTS = [
+  { id: "APT-001", patientId: "P-1004", doctor: "Dr. Priya Sharma", date: "19 Jun 2025", time: "10:30 AM", type: "Consultation", status: "Scheduled" },
+  { id: "APT-002", patientId: "P-1001", doctor: "Dr. Ravi Kumar", date: "19 Jun 2025", time: "09:00 AM", type: "Follow-up", status: "Completed" },
+]
 const STATUS_ORDER = ["Waiting", "With Nurse", "Ready for Doctor", "With Doctor", "Done"]
 
 // Vitals keyed by visit token
@@ -185,6 +187,7 @@ const initialState = {
   vitals: SEED_VITALS,
   diagnoses: SEED_DIAGNOSES,
   prescriptions: SEED_PRESCRIPTIONS,
+  appointments: SEED_APPOINTMENTS,        // ADD THIS
   labOrders: SEED_LAB_ORDERS,
   labResults: SEED_LAB_RESULTS,           // NEW
   radiologyOrders: SEED_RADIOLOGY_ORDERS, // NEW
@@ -256,6 +259,11 @@ function hospitalReducer(state, action) {
         ),
       }
     }
+
+    case 'ADD_PATIENT': {
+      return { ...state, patients: [action.payload, ...state.patients] }
+    }
+
     case 'SAVE_LAB_RESULT': {
       const { orderId, result } = action.payload
       return {
@@ -295,6 +303,16 @@ function hospitalReducer(state, action) {
 
     case 'CREATE_FOLLOWUP': {
       return { ...state, followUps: [action.payload, ...state.followUps] }
+    }
+    case 'CREATE_APPOINTMENT': {
+      return { ...state, appointments: [action.payload, ...state.appointments] }
+    }
+    case 'UPDATE_APPOINTMENT_STATUS': {
+      const { id, status } = action.payload
+      return {
+        ...state,
+        appointments: state.appointments.map(a => a.id === id ? { ...a, status } : a),
+      }
     }
 
     case 'UPDATE_FOLLOWUP_STATUS': {
@@ -347,11 +365,32 @@ function hospitalReducer(state, action) {
 // ─────────────────────────────────────────────────────────────────────────
 
 const HospitalContext = createContext(null)
+const STORAGE_KEY = 'hms_hospital_state'
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch (e) {
+    console.error('Failed to load saved state, using seed data', e)
+  }
+  return initialState
+}
 
 export function HospitalProvider({ children }) {
-  const [state, dispatch] = useReducer(hospitalReducer, initialState)
+  const [state, dispatch] = useReducer(hospitalReducer, undefined, loadState)
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  }, [state])
+
+  const resetDemoData = () => {
+    localStorage.removeItem(STORAGE_KEY)
+    window.location.reload()
+  }
+
   return (
-    <HospitalContext.Provider value={{ state, dispatch }}>
+    <HospitalContext.Provider value={{ state, dispatch, resetDemoData }}>
       {children}
     </HospitalContext.Provider>
   )
@@ -363,6 +402,33 @@ function useHospital() {
   return ctx
 }
 
+// In hospitalStore.jsx
+
+const STORAGE_KEY = 'hms_hospital_state'
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch (e) {
+    console.error('Failed to load saved state, using seed data', e)
+  }
+  return initialState // falls back to your existing SEED_* data
+}
+
+export function HospitalProvider({ children }) {
+  const [state, dispatch] = useReducer(hospitalReducer, undefined, loadState)
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  }, [state])
+
+  return (
+    <HospitalContext.Provider value={{ state, dispatch }}>
+      {children}
+    </HospitalContext.Provider>
+  )
+}
 // ─────────────────────────────────────────────────────────────────────────
 // SELECTOR HOOKS — pages import these instead of hardcoding mock arrays
 // ─────────────────────────────────────────────────────────────────────────
@@ -379,7 +445,10 @@ export function usePatient(patientId) {
   const { state } = useHospital()
   return state.patients.find(p => p.id === patientId) || null
 }
-
+export function useAddPatient() {
+  const { dispatch } = useHospital()
+  return (patient) => dispatch({ type: 'ADD_PATIENT', payload: patient })
+}
 // Today's queue, joined with patient info for convenience
 export function useQueue() {
   const { state, dispatch } = useHospital()
@@ -445,4 +514,43 @@ export function useBills() {
   const { state, dispatch } = useHospital()
   const addBill = (bill) => dispatch({ type: 'ADD_BILL', payload: bill })
   return { bills: state.bills, addBill }
+}
+
+export function useAppointments() {
+  const { state, dispatch } = useHospital()
+  const createAppointment = (appt) => dispatch({ type: 'CREATE_APPOINTMENT', payload: appt })
+  const updateStatus = (id, status) => dispatch({ type: 'UPDATE_APPOINTMENT_STATUS', payload: { id, status } })
+  return { appointments: state.appointments, createAppointment, updateStatus }
+}
+
+export function useLabResults() {
+  const { state, dispatch } = useHospital()
+  const saveResult = (orderId, result) =>
+    dispatch({ type: 'SAVE_LAB_RESULT', payload: { orderId, result } })
+  const updateDelivery = (orderId, delivery) =>
+    dispatch({ type: 'UPDATE_REPORT_DELIVERY', payload: { orderId, delivery } })
+  return { labResults: state.labResults, saveResult, updateDelivery }
+}
+
+export function useRadiologyOrders() {
+  const { state, dispatch } = useHospital()
+  const createRadiologyOrder = (order) =>
+    dispatch({ type: 'CREATE_RADIOLOGY_ORDER', payload: order })
+  const updateStatus = (id, status) =>
+    dispatch({ type: 'UPDATE_RADIOLOGY_STATUS', payload: { id, status } })
+  return { radiologyOrders: state.radiologyOrders, createRadiologyOrder, updateStatus }
+}
+
+export function useFollowUps() {
+  const { state, dispatch } = useHospital()
+  const createFollowUp = (followUp) =>
+    dispatch({ type: 'CREATE_FOLLOWUP', payload: followUp })
+  const updateStatus = (id, status) =>
+    dispatch({ type: 'UPDATE_FOLLOWUP_STATUS', payload: { id, status } })
+  return { followUps: state.followUps, createFollowUp, updateStatus }
+}
+
+export function useResetDemoData() {
+  const { resetDemoData } = useHospital()
+  return resetDemoData
 }

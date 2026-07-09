@@ -15,6 +15,10 @@ import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard'
 import PatientManagement from './pages/receptionist/PatientManagement'
 import PatientDetail from './pages/receptionist/PatientDetail'
 import PatientRegistration from './pages/receptionist/PatientRegistration'
+import AppointmentManagement from './pages/receptionist/AppointmentManagement'
+import QueueManagement from './pages/receptionist/QueueManagement'
+import BillingCollection from './pages/receptionist/BillingCollection'
+import FollowUpManagement from './pages/receptionist/FollowUpManagement'
 
 // Doctor pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
@@ -48,6 +52,7 @@ import Finance from './pages/admin/Finance'
 import FollowUps from './pages/admin/FollowUps'
 import Reports from './pages/admin/Reports'
 
+
 function App() {
   return (
     <BrowserRouter>
@@ -76,6 +81,27 @@ function App() {
             <PatientRegistration />
           </ProtectedRoute>
         } />
+        <Route path="/receptionist/appointments" element={
+          <ProtectedRoute allowedRole="receptionist">
+            <AppointmentManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/receptionist/queue" element={
+          <ProtectedRoute allowedRole="receptionist">
+            <QueueManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/receptionist/billing" element={
+          <ProtectedRoute allowedRole="receptionist">
+            <BillingCollection />
+          </ProtectedRoute>
+        } />
+        <Route path="/receptionist/followup" element={
+          <ProtectedRoute allowedRole="receptionist">
+            <FollowUpManagement />
+          </ProtectedRoute>
+        } />
+
 
         {/* Doctor module */}
         <Route path="/doctor" element={
@@ -114,6 +140,7 @@ function App() {
           </ProtectedRoute>
         } />
 
+
         {/* Nurse module */}
         <Route path="/nurse" element={
           <ProtectedRoute allowedRole="nurse">
@@ -135,6 +162,8 @@ function App() {
             <VitalsHistory />
           </ProtectedRoute>
         } />
+
+
 
         {/* Pharmacy module */}
         <Route path="/pharmacy" element={
@@ -172,6 +201,8 @@ function App() {
             <PrescriptionQueue />
           </ProtectedRoute>
         } />
+
+
 
         {/* Lab module */}
         <Route path="/lab" element={
@@ -211,6 +242,11 @@ function App() {
             <ReportsManagement />
           </ProtectedRoute>
         } />
+
+
+
+
+        {/* admin */}
         <Route path="/admin" element={
           <ProtectedRoute allowedRole="admin">
             <AdminDashboard />

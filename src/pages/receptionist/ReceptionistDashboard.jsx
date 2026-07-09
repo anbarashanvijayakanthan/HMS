@@ -4,7 +4,7 @@ import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
 import StatusBadge from '../../components/common/StatusBadge'
 import { useNavigate } from 'react-router-dom'
-import { useQueue } from '../../store/hospitalStore'
+import { useQueue, useAppointments, usePatients } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -14,17 +14,6 @@ const NAV_LINKS = [
   "Queue Management",
   "Billing Collection",
   "Follow-up Management",
-]
-
-// NOTE: Appointments are still local mock data for this step — only the
-// Live Queue panel is wired to the shared store so far. Appointments will
-// move to the store in a later step.
-const APPOINTMENTS = [
-  { patient: "Arjun Mehta",     pid: "P-1042", doctor: "Dr. Priya Sharma", time: "09:00 AM", type: "Consultation", status: "Completed"   },
-  { patient: "Kavitha Rajan",   pid: "P-1043", doctor: "Dr. Ravi Kumar",   time: "09:30 AM", type: "Follow-up",    status: "In Progress" },
-  { patient: "Mohammed Farhan", pid: "P-1044", doctor: "Dr. Priya Sharma", time: "10:00 AM", type: "New Patient",  status: "Waiting"     },
-  { patient: "Sneha Patel",     pid: "P-1045", doctor: "Dr. Arun Nair",    time: "10:30 AM", type: "Consultation", status: "Scheduled"   },
-  { patient: "Rajesh Verma",    pid: "P-1046", doctor: "Dr. Ravi Kumar",   time: "11:00 AM", type: "Review",       status: "Scheduled"   },
 ]
 
 const TYPE_STYLES = {
@@ -48,9 +37,17 @@ function ReceptionistDashboard() {
   const [activeLink, setActiveLink] = useState("Dashboard")
   const [search, setSearch] = useState('')
 
-  // ── Shared store — Live Queue panel ──
+  // ── Shared store ──
   const { queue } = useQueue()
+  const { appointments } = useAppointments()
+  const patients = usePatients()
+
   const liveQueue = queue.filter(v => v.status !== "Done").slice(0, 5)
+
+  const enrichedAppointments = appointments.map(a => ({
+    ...a,
+    patientName: patients.find(p => p.id === a.patientId)?.name || a.patientId,
+  }))
 
   const handleNavClick = (link) => {
     setActiveLink(link)
@@ -62,16 +59,20 @@ function ReceptionistDashboard() {
     if (link === "Follow-up Management")   navigate('/receptionist/followup')
   }
 
-  const filtered = APPOINTMENTS.filter(a =>
-    a.patient.toLowerCase().includes(search.toLowerCase()) ||
-    a.pid.toLowerCase().includes(search.toLowerCase()) ||
+  const filtered = enrichedAppointments.filter(a =>
+    a.patientName.toLowerCase().includes(search.toLowerCase()) ||
+    a.patientId.toLowerCase().includes(search.toLowerCase()) ||
     a.doctor.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+      <Sidebar
+        links={NAV_LINKS}
+        activeLink={activeLink}
+        onLinkClick={handleNavClick}
+      />
 
       <main className="flex-1 p-6 overflow-auto">
 
@@ -90,9 +91,9 @@ function ReceptionistDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="👥" label="Today's Patients"  value={queue.length}  sub="+12% vs yesterday" subColor="text-green-500" trend="up" />
-          <StatsCard icon="📅" label="Appointments"      value={23}        sub="6 pending"         subColor="text-orange-400" />
-          <StatsCard icon="🔢" label="In Queue"          value={liveQueue.length}         sub="Avg wait 14 min"   subColor="text-gray-400" />
+          <StatsCard icon="👥" label="Today's Patients"  value={queue.length} sub="+12% vs yesterday" subColor="text-green-500" trend="up" />
+          <StatsCard icon="📅" label="Appointments"      value={appointments.length} sub={`${appointments.filter(a => a.status === "Scheduled").length} pending`} subColor="text-orange-400" />
+          <StatsCard icon="🔢" label="In Queue"          value={liveQueue.length} sub="Avg wait 14 min" subColor="text-gray-400" />
           <StatsCard icon="💲" label="Billing Pending"   value="₹18,400"   sub="5 unpaid invoices" subColor="text-red-400" />
         </div>
 
@@ -126,11 +127,16 @@ function ReceptionistDashboard() {
         {/* Bottom: Appointments + Live Queue */}
         <div className="flex gap-4">
 
-          {/* Today's Appointments — unchanged for this step */}
+          {/* Today's Appointments — now from the shared store */}
           <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-700">Today's Appointments</h3>
-              <button className="text-xs text-blue-500 hover:underline">View All</button>
+              <button
+                onClick={() => navigate('/receptionist/appointments')}
+                className="text-xs text-blue-500 hover:underline"
+              >
+                View All
+              </button>
             </div>
 
             <table className="w-full text-sm">
@@ -141,15 +147,14 @@ function ReceptionistDashboard() {
                   <th className="pb-3 font-medium">Time</th>
                   <th className="pb-3 font-medium">Type</th>
                   <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a, i) => (
-                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                {filtered.map((a) => (
+                  <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
                     <td className="py-3">
-                      <p className="font-medium text-gray-800">{a.patient}</p>
-                      <p className="text-xs text-gray-400">{a.pid}</p>
+                      <p className="font-medium text-gray-800">{a.patientName}</p>
+                      <p className="text-xs text-gray-400">{a.patientId}</p>
                     </td>
                     <td className="py-3 text-gray-600">{a.doctor}</td>
                     <td className="py-3 text-gray-500">{a.time}</td>
@@ -159,19 +164,20 @@ function ReceptionistDashboard() {
                       </span>
                     </td>
                     <td className="py-3"><StatusBadge status={a.status} /></td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <button className="text-xs text-gray-400 hover:text-blue-500 transition">👁 View</button>
-                        <button className="text-xs text-gray-400 hover:text-blue-500 transition">✏️ Edit</button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400 text-sm">
+                      No appointments found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* Live Queue — now from the shared store */}
+          {/* Live Queue — from the shared store */}
           <div className="w-72 bg-white rounded-xl shadow-sm border border-gray-100 p-5 shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-700">Live Queue</h3>

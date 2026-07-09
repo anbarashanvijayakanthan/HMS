@@ -6,3 +6,13 @@ Doctor opens the case → sees vitals + history → adds Diagnosis → writes Pr
 Pharmacist receives the prescription in their queue → dispenses medicine → checks inventory/stock → bills the patient
 Lab Technician receives the lab order → collects sample → enters results → generates report → sends back to doctor
 Loop back to Receptionist for follow-up scheduling/billing, and the doctor sees lab results next time they open the case.
+
+
+What's left to hit "entirely working":
+
+Radiology Order + Follow-up Manager (Doctor) — next up, you already said go.
+Billing.jsx (Pharmacy) — small, same pattern as everything else.
+Vitals History (Nurse) — small.
+Receptionist: Appointments, Queue Management, Billing Collection, Follow-up Management — these don't exist as pages/routes at all, biggest real gap.
+Admin — either leave as a deliberately separate reporting layer (acceptable) or eventually pull its stats from the shared store.
+Cleanup pass: AdminTopBar duplication, AddVehicle.jsx stub, patient ID/token normalization mentioned early on.

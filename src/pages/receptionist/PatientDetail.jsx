@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
 import { useState } from 'react'
+import { usePatient, useVisit, useQueue } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -12,103 +13,34 @@ const NAV_LINKS = [
   "Follow-up Management",
 ]
 
-// Mock patient detail data keyed by ID
-const PATIENT_DETAILS = {
-  "P-1001": {
-    name: "Arjun Mehta",
-    gender: "Male",
-    dob: "12 Mar 1991 (34 Y)",
-    phone: "9876543210",
-    email: "arjun.mehta@gmail.com",
-    blood: "O+",
-    location: "Chennai, Tamil Nadu",
-    address: "Chennai",
-    age: "34 years",
-    aadhar: "9876 5432 1210",
-    department: "Cardiology",
-    allergies: "None",
-    chronic: "None",
-    height: "178 cm",
-    weight: "75 kg",
-    recentVisits: [
-      { date: "19 Jun 26", doctor: "Dr. Priya Sharma", dept: "Cardiology" },
-      { date: "12 Jun 26", doctor: "Dr. Priya Sharma", dept: "Cardiology" },
-      { date: "08 Jun 26", doctor: "Dr. Priya Sharma", dept: "Cardiology" },
-      { date: "01 Jun 26", doctor: "Dr. Priya Sharma", dept: "Cardiology" },
-    ],
-    nextAppointment: {
-      day: "24",
-      month: "JUN",
-      doctor: "Dr. Priya Sharma",
-      reason: "BP Monitoring Orders",
-      time: "10:30 AM",
-    }
-  },
-  "P-1006": {
-    name: "Ananya Krishnan",
-    gender: "Female",
-    dob: "15 Mar 1993 (32 Y)",
-    phone: "9988776655",
-    email: "ananyaKrishnan@gmail.com",
-    blood: "B+",
-    location: "Vellore, Tamil Nadu",
-    address: "Vellore",
-    age: "34 years",
-    aadhar: "9876 5432 1210",
-    department: "Cardiology",
-    allergies: "Penicillin, Pollen",
-    chronic: "Hypertension",
-    height: "175 cm",
-    weight: "72 kg",
-    recentVisits: [
-      { date: "19 Jun 26", doctor: "Dr. Ananya Krishnan", dept: "Cardiology" },
-      { date: "12 Jun 26", doctor: "Dr. Ananya Krishnan", dept: "Cardiology" },
-      { date: "08 Jun 26", doctor: "Dr. Ananya Krishnan", dept: "Cardiology" },
-      { date: "01 Jun 26", doctor: "Dr. Ananya Krishnan", dept: "Cardiology" },
-    ],
-    nextAppointment: {
-      day: "24",
-      month: "JUN",
-      doctor: "Dr. Ananya Krishnan",
-      reason: "BP Monitoring Orders",
-      time: "10:30 AM",
-    }
-  },
-}
-
-// Fallback for any patient not in detail mock
-const DEFAULT_PATIENT = (id) => ({
-  name: "Patient " + id,
-  gender: "—",
-  dob: "—",
-  phone: "—",
-  email: "—",
-  blood: "—",
-  location: "—",
-  address: "—",
-  age: "—",
-  aadhar: "—",
-  department: "—",
-  allergies: "None",
-  chronic: "None",
-  height: "—",
-  weight: "—",
-  recentVisits: [],
-  nextAppointment: null,
-})
-
 function PatientDetail() {
   const { id }     = useParams()
   const navigate   = useNavigate()
   const [activeLink, setActiveLink] = useState("Patient Management")
 
-  const patient = PATIENT_DETAILS[id] || DEFAULT_PATIENT(id)
+  // ── Shared store ──
+  const patient = usePatient(id)
+  const { queue } = useQueue()
 
   const handleNavClick = (link) => {
     setActiveLink(link)
     if (link === "Dashboard")          navigate('/receptionist')
     if (link === "Patient Management") navigate('/receptionist/patients')
   }
+
+  if (!patient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <p className="text-gray-500">No patient found for ID "{id}".</p>
+        </main>
+      </div>
+    )
+  }
+
+  // This patient's visit today, if any — real, from the shared queue
+  const todayVisit = queue.find(v => v.patientId === patient.id)
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -129,20 +61,15 @@ function PatientDetail() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
           <div className="flex items-center gap-6">
 
-            {/* Avatar */}
             <div className="w-20 h-20 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold text-2xl shrink-0">
               {patient.name.charAt(0)}
             </div>
 
-            {/* Name + details grid */}
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-800 mb-3">{patient.name}</h2>
               <div className="grid grid-cols-3 gap-y-2 gap-x-8 text-sm">
                 <div className="flex items-center gap-2 text-gray-600">
-                  <span>👤</span> {patient.gender}
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <span>📅</span> {patient.dob}
+                  <span>👤</span> {patient.gender}, {patient.age} yrs
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">
                   <span>🩸</span> {patient.blood}
@@ -154,12 +81,14 @@ function PatientDetail() {
                   <span>✉️</span> {patient.email}
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">
-                  <span>📍</span> {patient.location}
+                  <span>📍</span> {patient.address}
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <span>🏥</span> {patient.department}
                 </div>
               </div>
             </div>
 
-            {/* Action buttons */}
             <div className="flex flex-col gap-2 shrink-0">
               <button className="bg-gray-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-700 transition">
                 📅 Book Appointment
@@ -171,7 +100,7 @@ function PatientDetail() {
           </div>
         </div>
 
-        {/* Bottom 4 cards */}
+        {/* Bottom cards */}
         <div className="grid grid-cols-2 gap-5">
 
           {/* Personal Information */}
@@ -181,9 +110,8 @@ function PatientDetail() {
               {[
                 ["Full Name",    patient.name],
                 ["Address",     patient.address],
-                ["Age",         patient.age],
+                ["Age",         `${patient.age} years`],
                 ["Blood Group", patient.blood],
-                ["Aadhar No",   patient.aadhar],
                 ["Department",  patient.department],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between">
@@ -194,26 +122,33 @@ function PatientDetail() {
             </div>
           </div>
 
-          {/* Recent Visits */}
+          {/* Today's Visit — real, replaces the old fake "Recent Visits" list */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="font-semibold text-gray-700 mb-4">Recent Visits</h3>
-            <div className="flex flex-col gap-3">
-              {patient.recentVisits.map((v, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 w-20 shrink-0">{v.date}</span>
-                  <span className="text-gray-700 flex-1">{v.doctor}</span>
-                  <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">
-                    {v.dept}
-                  </span>
-                  <button className="ml-3 text-xs text-gray-400 hover:text-blue-500 transition flex items-center gap-1">
-                    👁 View
-                  </button>
+            <h3 className="font-semibold text-gray-700 mb-4">Today's Visit</h3>
+            {todayVisit ? (
+              <div className="flex flex-col gap-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Token</span>
+                  <span className="font-mono text-xs text-gray-600">{todayVisit.token}</span>
                 </div>
-              ))}
-              {patient.recentVisits.length === 0 && (
-                <p className="text-sm text-gray-400">No visits recorded yet.</p>
-              )}
-            </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Check-in</span>
+                  <span className="text-gray-700">{todayVisit.checkIn}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Status</span>
+                  <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">
+                    {todayVisit.status}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Complaint</span>
+                  <span className="text-gray-700 text-right max-w-40">{todayVisit.complaint}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No visit today.</p>
+            )}
           </div>
 
           {/* Medical Summary */}
@@ -221,49 +156,31 @@ function PatientDetail() {
             <h3 className="font-semibold text-gray-700 mb-4">Medical Summary</h3>
             <div className="flex flex-col gap-2.5 text-sm">
               {[
-                ["Allergies",   patient.allergies],
+                ["Allergies",   patient.allergies?.length ? patient.allergies.join(', ') : "None"],
                 ["Chronic",     patient.chronic],
-                ["Age",         patient.age],
                 ["Blood Group", patient.blood],
                 ["Height",      patient.height],
                 ["Weight",      patient.weight],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between">
                   <span className="text-blue-500 font-medium">{label}</span>
-                  <span className="text-gray-700">{value}</span>
+                  <span className={label === "Allergies" && value !== "None" ? "text-red-500 font-medium" : "text-gray-700"}>
+                    {value}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Next Appointment */}
+          {/* Next Appointment — placeholder, no appointments entity in the store yet */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h3 className="font-semibold text-gray-700 mb-4">Next Appointment</h3>
-            {patient.nextAppointment ? (
-              <>
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="text-center bg-blue-50 rounded-xl px-4 py-3 shrink-0">
-                    <p className="text-2xl font-bold text-gray-800">{patient.nextAppointment.day}</p>
-                    <p className="text-xs text-blue-500 font-semibold">{patient.nextAppointment.month}</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800">{patient.nextAppointment.doctor}</p>
-                    <p className="text-sm text-gray-400 mt-0.5">Reason: {patient.nextAppointment.reason}</p>
-                    <p className="text-sm text-gray-400">{patient.nextAppointment.time}</p>
-                  </div>
-                </div>
-                <button className="w-full text-center text-sm text-blue-500 hover:text-blue-600 transition font-medium">
-                  + Schedule New Follow-up
-                </button>
-              </>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-sm text-gray-400 mb-3">No upcoming appointment</p>
-                <button className="text-sm text-blue-500 hover:text-blue-600 transition font-medium">
-                  + Schedule Appointment
-                </button>
-              </div>
-            )}
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-400 mb-3">Appointments aren't tracked in the shared store yet</p>
+              <button className="text-sm text-blue-500 hover:text-blue-600 transition font-medium">
+                + Schedule Appointment
+              </button>
+            </div>
           </div>
 
         </div>

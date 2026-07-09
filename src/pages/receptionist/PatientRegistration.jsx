@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Sidebar from '../../components/common/Sidebar'
 import { useNavigate } from 'react-router-dom'
+import { useAddPatient } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -36,7 +37,7 @@ function PatientRegistration() {
   const [allergyInput, setAllergyInput] = useState('')
   const [photo, setPhoto]           = useState(null)
   const [errors, setErrors]         = useState({})
-
+const addPatient = useAddPatient()
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }))
@@ -68,12 +69,34 @@ function PatientRegistration() {
   }
 
   const handleRegister = () => {
-    const e = validate()
-    if (Object.keys(e).length > 0) { setErrors(e); return }
-    // TODO: connect to API
-    alert(`Patient ${form.firstName} ${form.lastName} registered successfully!`)
-    navigate('/receptionist/patients')
-  }
+  const e = validate()
+  if (Object.keys(e).length > 0) { setErrors(e); return }
+
+  const age = form.dob
+    ? Math.floor((Date.now() - new Date(form.dob)) / (365.25 * 24 * 60 * 60 * 1000))
+    : 0
+
+  const newId = `P-${1000 + Math.floor(Math.random() * 9000)}`
+
+  addPatient({
+    id: newId,
+    name: `${form.firstName} ${form.lastName}`,
+    age,
+    gender: form.gender,
+    blood: form.bloodGroup || "—",
+    phone: form.mobile,
+    email: form.email || "—",
+    department: form.department,
+    allergies: allergies,
+    chronic: "None",
+    address: form.address || "—",
+    height: "—",
+    weight: "—",
+  })
+
+  alert(`Patient ${form.firstName} ${form.lastName} registered successfully! ID: ${newId}`)
+  navigate('/receptionist/patients')
+}
 
   const handleSaveDraft = () => {
     alert('Saved as draft!')

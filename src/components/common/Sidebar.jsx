@@ -1,6 +1,6 @@
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-
+import { useResetDemoData } from '../../store/hospitalStore'
 // Role-based nav icons — add more as needed
 const NAV_ICONS = {
   // Doctor
@@ -66,10 +66,17 @@ const ROLE_COLORS = {
 function Sidebar({ links, activeLink, onLinkClick }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const resetDemoData = useResetDemoData()
 
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  const handleReset = () => {
+    if (confirm('Reset all demo data back to the starting point? This cannot be undone.')) {
+      resetDemoData()
+    }
   }
 
   const avatarColor = ROLE_COLORS[user?.role] || "bg-blue-500"
@@ -145,6 +152,13 @@ function Sidebar({ links, activeLink, onLinkClick }) {
           <span className="text-base w-5 text-center">⚙️</span>
           <span>Settings</span>
         </button>
+<button
+          onClick={handleReset}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-yellow-400/80 hover:bg-yellow-500/10 hover:text-yellow-400 transition-all"
+        >
+          <span className="text-base w-5 text-center">↺</span>
+          <span>Reset Demo Data</span>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-all"
@@ -156,5 +170,4 @@ function Sidebar({ links, activeLink, onLinkClick }) {
     </aside>
   )
 }
-
 export default Sidebar
