@@ -22,6 +22,8 @@ src/
     ProtectedRoute.jsx
   services/
     api.js           ← all axios calls
+  store/
+    hospitalStore.jsx
 
     
 Phase 2 — Auth + Routing (1-2 days, 1 person)

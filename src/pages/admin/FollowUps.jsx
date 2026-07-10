@@ -1,23 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
+import { useFollowUps, usePatients } from '../../store/hospitalStore'
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
   'Dashboard', 'Patients', 'Appointments', 'Doctors', 'Staff',
   'OP', 'IP', 'Prescriptions', 'Pharmacy', 'Laboratory',
   'Vehicles', 'Finance', 'Follow-ups', 'Reports', 'Settings',
-]
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const FOLLOWUPS = [
-  { id: 1, name: 'Ananya Krishnan', treatment: 'Post-cardiac review', doctor: 'Dr. Suresh Kumar', due: '16 Jun 2026', status: 'Due Today',   avatarColor: 'bg-blue-200',   avatarText: 'AK' },
-  { id: 2, name: 'Rajan Mehta',     treatment: 'Ortho follow-up',     doctor: 'Dr. Arun Sharma',  due: '16 Jun 2026', status: 'Due Today',   avatarColor: 'bg-gray-300',   avatarText: 'RM' },
-  { id: 3, name: 'Meera Joshi',     treatment: 'Diabetes monitoring', doctor: 'Dr. Priya Menon',  due: '13 Jun 2026', status: 'Missed',      avatarColor: 'bg-orange-200', avatarText: 'MJ' },
-  { id: 4, name: 'Vikram Patel',    treatment: 'Neuro review',        doctor: 'Dr. Kavitha Rao',  due: '10 Jun 2026', status: 'Completed',   avatarColor: 'bg-purple-200', avatarText: 'VP' },
-  { id: 5, name: 'Priya Sundaram',  treatment: 'Pregnancy check',     doctor: 'Dr. Preethi Nair', due: '22 Jun 2026', status: 'Rescheduled', avatarColor: 'bg-pink-200',   avatarText: 'PS' },
-  { id: 6, name: 'Priya Sundaram',  treatment: 'Pregnancy check',     doctor: 'Dr. Preethi Nair', due: '22 Jun 2026', status: 'Rescheduled', avatarColor: 'bg-pink-200',   avatarText: 'PS' },
-  { id: 7, name: 'Priya Sundaram',  treatment: 'Pregnancy check',     doctor: 'Dr. Preethi Nair', due: '22 Jun 2026', status: 'Rescheduled', avatarColor: 'bg-pink-200',   avatarText: 'PS' },
 ]
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
@@ -39,7 +29,7 @@ function FollowUpStat({ value, label, variant }) {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function FollowUpBadge({ status }) {
   const s = {
-    'Due Today':   'bg-blue-100 text-blue-600',
+    'Scheduled':   'bg-blue-100 text-blue-600',
     'Missed':      'bg-red-100 text-red-500',
     'Completed':   'bg-green-100 text-green-600',
     'Rescheduled': 'bg-yellow-100 text-yellow-600',
@@ -98,24 +88,35 @@ function IconButton({ title, onClick, hoverColor, children }) {
   )
 }
 
+// ─── Avatar helper — derive initials + a stable color from patient name ──────
+const AVATAR_COLORS = [
+  'bg-blue-200', 'bg-pink-200', 'bg-orange-200',
+  'bg-purple-200', 'bg-teal-200', 'bg-gray-300',
+]
+function initials(name) {
+  if (!name) return "?"
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
 // ─── Follow-up row ─────────────────────────────────────────────────────────────
-function FollowUpRow({ item, onAction }) {
+function FollowUpRow({ item, idx, onAction }) {
+  const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length]
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50
                     last:border-0 hover:bg-gray-50 transition">
 
       {/* Left: avatar + details */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-10 h-10 rounded-full ${item.avatarColor} flex items-center
+        <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center
                          justify-center text-gray-600 text-xs font-bold shrink-0`}>
-          {item.avatarText}
+          {initials(item.patientName)}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-800">{item.name}</p>
+          <p className="text-sm font-semibold text-gray-800">{item.patientName}</p>
           <p className="text-xs text-gray-400">
-            {item.treatment} · {item.doctor}
+            {item.purpose} · {item.doctor}
           </p>
-          <p className="text-xs text-gray-400">Due: {item.due}</p>
+          <p className="text-xs text-gray-400">Due: {item.date}</p>
         </div>
       </div>
 
@@ -124,7 +125,6 @@ function FollowUpRow({ item, onAction }) {
         <FollowUpBadge status={item.status} />
 
         <div className="flex items-center gap-3">
-          {/* Call */}
           <IconButton title="Call" hoverColor="hover:text-blue-500" onClick={() => onAction(item.id, 'call')}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round"
@@ -135,7 +135,6 @@ function FollowUpRow({ item, onAction }) {
             </svg>
           </IconButton>
 
-          {/* Message */}
           <IconButton title="Message" hoverColor="hover:text-blue-500" onClick={() => onAction(item.id, 'message')}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round"
@@ -145,14 +144,12 @@ function FollowUpRow({ item, onAction }) {
             </svg>
           </IconButton>
 
-          {/* Mark complete */}
           <IconButton title="Mark Complete" hoverColor="hover:text-green-500" onClick={() => onAction(item.id, 'complete')}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </IconButton>
 
-          {/* Reschedule */}
           <IconButton title="Reschedule" hoverColor="hover:text-yellow-500" onClick={() => onAction(item.id, 'reschedule')}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round"
@@ -168,31 +165,35 @@ function FollowUpRow({ item, onAction }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function FollowUps() {
-  const navigate              = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState('Follow-ups')
-  const [search, setSearch]         = useState('')
-  const [items, setItems]           = useState(FOLLOWUPS)
+  const [search, setSearch] = useState('')
 
-  const filtered = items.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.treatment.toLowerCase().includes(search.toLowerCase()) ||
+  // ── Shared store — the SAME followUps the Doctor module writes to ──
+  const { followUps, updateStatus } = useFollowUps()
+  const patients = usePatients()
+
+  const enriched = followUps.map(f => ({
+    ...f,
+    patientName: patients.find(p => p.id === f.patientId)?.name || f.patientId,
+  }))
+
+  const filtered = enriched.filter(i =>
+    i.patientName.toLowerCase().includes(search.toLowerCase()) ||
+    i.purpose.toLowerCase().includes(search.toLowerCase()) ||
     i.doctor.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Derived stats
-  const dueToday   = items.filter(i => i.status === 'Due Today').length
-  const missed     = items.filter(i => i.status === 'Missed').length
-  const completed  = items.filter(i => i.status === 'Completed').length
-  const rescheduled= items.filter(i => i.status === 'Rescheduled').length
+  // Derived stats — note: this store only tracks Scheduled/Completed/Rescheduled
+  // today (no automatic "Missed" detection based on date yet)
+  const scheduled   = enriched.filter(i => i.status === 'Scheduled').length
+  const completed   = enriched.filter(i => i.status === 'Completed').length
+  const rescheduled = enriched.filter(i => i.status === 'Rescheduled').length
 
   const handleAction = (id, action) => {
-    if (action === 'complete') {
-      setItems(prev => prev.map(i => i.id === id ? { ...i, status: 'Completed' } : i))
-    }
-    if (action === 'reschedule') {
-      setItems(prev => prev.map(i => i.id === id ? { ...i, status: 'Rescheduled' } : i))
-    }
-    // 'call' / 'message' — hook up to backend later
+    if (action === 'complete')    updateStatus(id, 'Completed')
+    if (action === 'reschedule')  updateStatus(id, 'Rescheduled')
+    // 'call' / 'message' — no backend concept for these yet
   }
 
   return (
@@ -222,38 +223,32 @@ function FollowUps() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-800">Follow-ups</h2>
-              <p className="text-sm text-gray-400 mt-0.5">Patient follow-up tracking</p>
+              <p className="text-sm text-gray-400 mt-0.5">
+                Patient follow-up tracking — same data scheduled by doctors
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-1.5 text-sm text-gray-500
-                                 hover:text-gray-700 transition">
-                ⬇ Export
-              </button>
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700
-                                 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition">
-                <span className="text-base font-bold leading-none">+</span>
-                Add Expense
-              </button>
-            </div>
+            <button className="flex items-center gap-1.5 text-sm text-gray-500
+                               hover:text-gray-700 transition">
+              ⬇ Export
+            </button>
           </div>
 
           {/* Stat cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <FollowUpStat value={dueToday}    label="Due Today"   variant="blue"   />
-            <FollowUpStat value={missed}      label="Missed"      variant="red"    />
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <FollowUpStat value={scheduled}   label="Scheduled"   variant="blue"   />
             <FollowUpStat value={completed}   label="Completed"   variant="green"  />
             <FollowUpStat value={rescheduled} label="Rescheduled" variant="yellow" />
           </div>
 
           {/* Follow-up list */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            {filtered.map(item => (
-              <FollowUpRow key={item.id} item={item} onAction={handleAction} />
+            {filtered.map((item, idx) => (
+              <FollowUpRow key={item.id} item={item} idx={idx} onAction={handleAction} />
             ))}
 
             {filtered.length === 0 && (
               <div className="py-12 text-center text-gray-400 text-sm">
-                No follow-ups found
+                No follow-ups scheduled yet — these are created from the Doctor module
               </div>
             )}
           </div>

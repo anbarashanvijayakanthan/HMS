@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
-import StatusBadge from '../../components/common/StatusBadge'
 import { useNavigate } from 'react-router-dom'
+import { useQueue, STATUS_ORDER } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -11,27 +11,12 @@ const NAV_LINKS = [
   "Vitals History",
 ]
 
-const STATUS_ORDER = ["Waiting", "With Nurse", "Ready for Doctor", "With Doctor", "Done"]
-
-const INITIAL_PATIENTS = [
-  { token: "T-001", name: "Arjun Mehta",      department: "Cardiology", checkIn: "08:45 AM", status: "Done",             lastUpdated: "10:20 AM" },
-  { token: "T-007", name: "Kavitha Rajan",    department: "General",    checkIn: "09:20 AM", status: "With Doctor",      lastUpdated: "11:05 AM" },
-  { token: "T-008", name: "Mohammed Farhan",  department: "General",    checkIn: "09:30 AM", status: "With Nurse",       lastUpdated: "11:10 AM" },
-  { token: "T-009", name: "Sneha Patel",      department: "Cardiology", checkIn: "09:45 AM", status: "Ready for Doctor", lastUpdated: "11:08 AM" },
-  { token: "T-010", name: "Rajesh Verma",     department: "Ortho",      checkIn: "10:00 AM", status: "Waiting",          lastUpdated: "10:00 AM" },
-  { token: "T-011", name: "Anita Desai",      department: "General",    checkIn: "10:10 AM", status: "With Nurse",       lastUpdated: "11:00 AM" },
-  { token: "T-012", name: "Vikram Nair",      department: "Neuro",      checkIn: "10:20 AM", status: "Waiting",          lastUpdated: "10:20 AM" },
-  { token: "T-013", name: "Priya Krishnan",   department: "General",    checkIn: "10:35 AM", status: "Waiting",          lastUpdated: "10:35 AM" },
-  { token: "T-002", name: "Riya Shah",        department: "General",    checkIn: "08:50 AM", status: "Done",             lastUpdated: "10:30 AM" },
-  { token: "T-003", name: "Suresh Kumar",     department: "Ortho",      checkIn: "09:00 AM", status: "Done",             lastUpdated: "10:45 AM" },
-]
-
 const COLUMN_CONFIG = {
-  "Waiting":          { label: "WAITING",           color: "border-yellow-400 bg-yellow-50",  headerColor: "text-yellow-600", countColor: "text-yellow-600" },
-  "With Nurse":       { label: "WITH NURSE",         color: "border-blue-400 bg-blue-50",     headerColor: "text-blue-600",   countColor: "text-blue-600"   },
-  "Ready for Doctor": { label: "READY FOR DOCTOR",   color: "border-purple-400 bg-purple-50", headerColor: "text-purple-600", countColor: "text-purple-600" },
-  "With Doctor":      { label: "WITH DOCTOR",        color: "border-teal-400 bg-teal-50",     headerColor: "text-teal-600",   countColor: "text-teal-600"   },
-  "Done":             { label: "DONE",               color: "border-green-400 bg-green-50",   headerColor: "text-green-600",  countColor: "text-green-600"  },
+  "Waiting":          { label: "WAITING",         color: "border-yellow-400 bg-yellow-50",  headerColor: "text-yellow-600", countColor: "text-yellow-600" },
+  "With Nurse":       { label: "WITH NURSE",       color: "border-blue-400 bg-blue-50",     headerColor: "text-blue-600",   countColor: "text-blue-600"   },
+  "Ready for Doctor": { label: "READY FOR DOCTOR", color: "border-purple-400 bg-purple-50", headerColor: "text-purple-600", countColor: "text-purple-600" },
+  "With Doctor":      { label: "WITH DOCTOR",      color: "border-teal-400 bg-teal-50",     headerColor: "text-teal-600",   countColor: "text-teal-600"   },
+  "Done":             { label: "DONE",             color: "border-green-400 bg-green-50",   headerColor: "text-green-600",  countColor: "text-green-600"  },
 }
 
 const STATUS_BADGE_STYLES = {
@@ -47,14 +32,17 @@ const DEPT_STYLES = {
   General:    "bg-gray-100 text-gray-600",
   Ortho:      "bg-blue-50 text-blue-600",
   Neuro:      "bg-purple-50 text-purple-600",
+  Emergency:  "bg-red-50 text-red-600",
 }
 
 function PatientQueue() {
   const { user }   = useAuth()
   const navigate   = useNavigate()
   const [activeLink, setActiveLink] = useState("Patient Queue")
-  const [patients, setPatients]     = useState(INITIAL_PATIENTS)
   const [search, setSearch]         = useState('')
+
+  // ── Shared store — replaces the old local useState(INITIAL_PATIENTS) ──
+  const { queue, advanceStatus, setStatus } = useQueue()
 
   const handleNavClick = (link) => {
     setActiveLink(link)
@@ -63,43 +51,21 @@ function PatientQueue() {
     if (link === "Vitals History") navigate('/nurse/vitals-history')
   }
 
-  // Move patient to next status
-  const handleMove = (token) => {
-    setPatients(prev => prev.map(p => {
-      if (p.token !== token) return p
-      const idx = STATUS_ORDER.indexOf(p.status)
-      if (idx < STATUS_ORDER.length - 1) {
-        return { ...p, status: STATUS_ORDER[idx + 1], lastUpdated: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }
-      }
-      return p
-    }))
-  }
+  const filtered = queue.filter(v => {
+    const name = v.patient?.name || ""
+    return (
+      name.toLowerCase().includes(search.toLowerCase()) ||
+      v.token.toLowerCase().includes(search.toLowerCase()) ||
+      v.department.toLowerCase().includes(search.toLowerCase())
+    )
+  })
 
-  // Change status from table dropdown
-  const handleStatusChange = (token, newStatus) => {
-    setPatients(prev => prev.map(p =>
-      p.token === token
-        ? { ...p, status: newStatus, lastUpdated: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }
-        : p
-    ))
-  }
-
-  const filtered = patients.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.token.toLowerCase().includes(search.toLowerCase()) ||
-    p.department.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const byStatus = (status) => patients.filter(p => p.status === status)
+  const byStatus = (status) => queue.filter(v => v.status === status)
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      <Sidebar
-        links={NAV_LINKS}
-        activeLink={activeLink}
-        onLinkClick={handleNavClick}
-      />
+      <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
 
       <main className="flex-1 p-6 overflow-auto">
 
@@ -126,11 +92,7 @@ function PatientQueue() {
             const col     = COLUMN_CONFIG[status]
             const colPats = byStatus(status)
             return (
-              <div
-                key={status}
-                className={`rounded-xl border-2 ${col.color} p-3 min-h-48`}
-              >
-                {/* Column header */}
+              <div key={status} className={`rounded-xl border-2 ${col.color} p-3 min-h-48`}>
                 <div className="flex items-center justify-between mb-3">
                   <span className={`text-xs font-bold tracking-wide ${col.headerColor}`}>
                     {col.label}
@@ -140,18 +102,17 @@ function PatientQueue() {
                   </span>
                 </div>
 
-                {/* Cards */}
                 <div className="flex flex-col gap-2">
-                  {colPats.map(p => {
-                    const nextIdx = STATUS_ORDER.indexOf(p.status) + 1
+                  {colPats.map(v => {
+                    const nextIdx = STATUS_ORDER.indexOf(v.status) + 1
                     const nextStatus = STATUS_ORDER[nextIdx]
                     return (
-                      <div key={p.token} className="bg-white rounded-lg p-3 shadow-sm border border-white">
-                        <p className="font-semibold text-gray-800 text-sm leading-tight">{p.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{p.token} · {p.department}</p>
+                      <div key={v.token} className="bg-white rounded-lg p-3 shadow-sm border border-white">
+                        <p className="font-semibold text-gray-800 text-sm leading-tight">{v.patient?.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{v.token} · {v.department}</p>
                         {status !== "Done" && nextStatus && (
                           <button
-                            onClick={() => handleMove(p.token)}
+                            onClick={() => advanceStatus(v.token)}
                             className="mt-2 flex items-center gap-1 text-xs text-gray-600 border border-gray-200 px-2 py-1 rounded-md hover:bg-gray-50 transition"
                           >
                             Move →
@@ -205,26 +166,26 @@ function PatientQueue() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
-                <tr key={p.token} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                  <td className="py-3 font-mono text-xs text-gray-500 font-semibold">{p.token}</td>
-                  <td className="py-3 font-medium text-gray-800">{p.name}</td>
+              {filtered.map(v => (
+                <tr key={v.token} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <td className="py-3 font-mono text-xs text-gray-500 font-semibold">{v.token}</td>
+                  <td className="py-3 font-medium text-gray-800">{v.patient?.name}</td>
                   <td className="py-3">
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${DEPT_STYLES[p.department] || 'bg-gray-100 text-gray-600'}`}>
-                      {p.department}
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${DEPT_STYLES[v.department] || 'bg-gray-100 text-gray-600'}`}>
+                      {v.department}
                     </span>
                   </td>
-                  <td className="py-3 text-gray-500">{p.checkIn}</td>
+                  <td className="py-3 text-gray-500">{v.checkIn}</td>
                   <td className="py-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_BADGE_STYLES[p.status] || 'bg-gray-100 text-gray-600'}`}>
-                      {p.status}
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_BADGE_STYLES[v.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {v.status}
                     </span>
                   </td>
-                  <td className="py-3 text-gray-400 text-xs">{p.lastUpdated}</td>
+                  <td className="py-3 text-gray-400 text-xs">{v.lastUpdated}</td>
                   <td className="py-3">
                     <select
-                      value={p.status}
-                      onChange={e => handleStatusChange(p.token, e.target.value)}
+                      value={v.status}
+                      onChange={e => setStatus(v.token, e.target.value)}
                       className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
                       {STATUS_ORDER.map(s => (

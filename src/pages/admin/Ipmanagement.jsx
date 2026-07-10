@@ -10,6 +10,21 @@ const NAV_LINKS = [
 ]
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
+// const STAFF_DATA = [
+//   { id: 'S-101', name: 'Esther Howard',       role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
+//   { id: 'S-102', name: 'Cameron Williamson',  role: 'Lab Technician',   dept: 'Laboratory',   phone: '+91 90001 21002', attendance: '95%',  status: 'Active'   },
+//   { id: 'S-103', name: 'Jenny Wilson',        role: 'Pharmacist',       dept: 'Pharmacy',     phone: '+91 90001 21003', attendance: '100%', status: 'Active'   },
+//   { id: 'S-104', name: 'Brooklyn Simmons',    role: 'Receptionist',     dept: 'OPD',          phone: '+91 90001 21004', attendance: '92%',  status: 'On Leave' },
+//   { id: 'S-105', name: 'Jacob Jones',         role: 'Ward Nurse',       dept: 'General Ward', phone: '+91 90001 21005', attendance: '88%',  status: 'On Leave' },
+//   { id: 'S-106', name: 'Biju Jose',           role: 'Accountant',       dept: 'Finance',      phone: '+91 90001 21006', attendance: '96%',  status: 'Active'   },
+//   { id: 'S-101', name: 'Theresa Webb',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
+//   { id: 'S-101', name: 'Eleanor Pena',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
+//   { id: 'S-101', name: 'Kristin Watson',      role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
+// ]
+// ─── Mock data ───────────────────────────────────────────────────────────────
+// NOTE: This page shows IP (inpatient) records, not staff — despite the
+// variable name. There's no real `inpatients` entity in the shared store
+// yet, so this stays local mock for now (out of scope for today).
 const STAFF_DATA = [
   { id: 'S-101', name: 'Esther Howard',       role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
   { id: 'S-102', name: 'Cameron Williamson',  role: 'Lab Technician',   dept: 'Laboratory',   phone: '+91 90001 21002', attendance: '95%',  status: 'Active'   },
@@ -17,11 +32,10 @@ const STAFF_DATA = [
   { id: 'S-104', name: 'Brooklyn Simmons',    role: 'Receptionist',     dept: 'OPD',          phone: '+91 90001 21004', attendance: '92%',  status: 'On Leave' },
   { id: 'S-105', name: 'Jacob Jones',         role: 'Ward Nurse',       dept: 'General Ward', phone: '+91 90001 21005', attendance: '88%',  status: 'On Leave' },
   { id: 'S-106', name: 'Biju Jose',           role: 'Accountant',       dept: 'Finance',      phone: '+91 90001 21006', attendance: '96%',  status: 'Active'   },
-  { id: 'S-101', name: 'Theresa Webb',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
-  { id: 'S-101', name: 'Eleanor Pena',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
-  { id: 'S-101', name: 'Kristin Watson',      role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21001', attendance: '98%',  status: 'Active'   },
+  { id: 'S-107', name: 'Theresa Webb',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21007', attendance: '98%',  status: 'Active'   },
+  { id: 'S-108', name: 'Eleanor Pena',        role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21008', attendance: '98%',  status: 'Active'   },
+  { id: 'S-109', name: 'Kristin Watson',      role: 'Head Nurse',       dept: 'ICU',          phone: '+91 90001 21009', attendance: '98%',  status: 'Active'   },
 ]
-
 // Initials from name
 function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()

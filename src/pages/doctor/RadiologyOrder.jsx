@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
+import { useVisit, useDiagnoses, useRadiologyOrders } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard", "Patient Consultation", "Diagnosis",
   "Prescription", "Lab Order", "Radiology Order", "Follow-up Manager",
 ]
-
-const MOCK_PATIENTS = {
-  "T-009": { name: "Sneha Patel", ageSex: "31 yrs / F", id: "P-1004", diagnosis: "HTN, Arrhythmia" },
-  "T-010": { name: "Rajesh Verma", ageSex: "56 yrs / M", id: "P-1045", diagnosis: "Hypertension" },
-}
 
 const MODALITIES = ["X-Ray", "CT Scan", "MRI", "Ultrasound", "2D Echo", "ECG"]
 
@@ -32,14 +29,18 @@ const priorityStyle = {
   Urgent:  "bg-orange-100 text-orange-600",
 }
 
+let radCounter = 1 // demo-only incrementing id; real backend would assign this
+
 function RadiologyOrder() {
   const { token } = useParams()
   const navigate  = useNavigate()
+  const { user }  = useAuth()
   const [activeLink, setActiveLink] = useState("Radiology Order")
 
-  const patient = MOCK_PATIENTS[token] || {
-    name: "Unknown", ageSex: "--", id: "--", diagnosis: "--",
-  }
+  // ── Shared store ──
+  const { visit, patient } = useVisit(token)
+  const { diagnoses } = useDiagnoses(patient?.id)
+  const { radiologyOrders, createRadiologyOrder } = useRadiologyOrders()
 
   // Form state
   const [search,        setSearch]        = useState('')
@@ -50,16 +51,11 @@ function RadiologyOrder() {
   const [contrast,      setContrast]      = useState('No')
   const [reason,        setReason]        = useState('')
 
-  // Dropdowns
   const [showInvList,  setShowInvList]  = useState(false)
   const [showBodyList, setShowBodyList] = useState(false)
 
-  // Selected investigations list
-  const [investigations, setInvestigations] = useState([
-    { type: "ECG",        region: "Heart", priority: "STAT",    contrast: "None", reason: "Palpitations, Arrhythmia workup" },
-    { type: "Chest X-Ray",region: "Chest", priority: "Routine", contrast: "None", reason: "Cardiac silhouette assessment" },
-    { type: "2D Echo",    region: "Heart", priority: "Urgent",  contrast: "None", reason: "Evaluate cardiac function" },
-  ])
+  // This patient's investigations already sent to Radiology this visit
+  const investigations = radiologyOrders.filter(r => r.token === token)
 
   const filteredInv = INVESTIGATION_TYPES.filter(i =>
     i.toLowerCase().includes(search.toLowerCase()) &&
@@ -67,18 +63,24 @@ function RadiologyOrder() {
   )
 
   const handleAdd = () => {
-    if (!invType || !bodyPart) return
-    setInvestigations(prev => [...prev, {
-      type: invType, region: bodyPart,
-      priority, contrast: contrast === 'Yes' ? 'With Contrast' : 'None',
+    if (!invType || !bodyPart || !patient) return
+    radCounter += 1
+    createRadiologyOrder({
+      id: `RO-${radCounter}`,
+      patientId: patient.id,
+      token,
+      doctor: `Dr. ${user?.name}`,
+      type: invType,
+      region: bodyPart,
+      modality,
+      priority,
+      contrast: contrast === 'Yes' ? 'With Contrast' : 'None',
       reason,
-    }])
+      status: "Pending",
+      ordered: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    })
     setInvType(''); setBodyPart(''); setPriority('Routine')
     setContrast('No'); setReason(''); setSearch('')
-  }
-
-  const handleRemove = (i) => {
-    setInvestigations(prev => prev.filter((_, idx) => idx !== i))
   }
 
   const handleNavClick = (link) => {
@@ -90,6 +92,21 @@ function RadiologyOrder() {
     if (link === "Lab Order")            navigate(`/doctor/lab-order/${token}`)
     if (link === "Follow-up Manager")    navigate(`/doctor/followup/${token}`)
   }
+
+  if (!patient || !visit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <p className="text-gray-500">No patient found for token "{token}".</p>
+        </main>
+      </div>
+    )
+  }
+
+  const diagnosisText = diagnoses.length > 0
+    ? diagnoses.map(d => d.name).join(', ')
+    : "No diagnosis recorded"
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -121,7 +138,6 @@ function RadiologyOrder() {
                 Search & Select Investigation
               </h3>
 
-              {/* Search + Modality Buttons */}
               <div className="flex gap-2 mb-5">
                 <div className="flex-1 relative">
                   <input
@@ -164,10 +180,8 @@ function RadiologyOrder() {
                 ))}
               </div>
 
-              {/* Form Row */}
               <div className="grid grid-cols-2 gap-4 mb-4">
 
-                {/* Investigation Type */}
                 <div className="relative">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                     Investigation Type *
@@ -180,7 +194,6 @@ function RadiologyOrder() {
                   />
                 </div>
 
-                {/* Body Part */}
                 <div className="relative">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                     Body Part / Region *
@@ -210,10 +223,8 @@ function RadiologyOrder() {
                 </div>
               </div>
 
-              {/* Priority + Contrast Row */}
               <div className="grid grid-cols-2 gap-4 mb-4">
 
-                {/* Clinical Priority */}
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                     Clinical Priority *
@@ -235,7 +246,6 @@ function RadiologyOrder() {
                   </div>
                 </div>
 
-                {/* Contrast Required */}
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                     Contrast Required?
@@ -258,7 +268,6 @@ function RadiologyOrder() {
                 </div>
               </div>
 
-              {/* Clinical Reason */}
               <div className="mb-5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Clinical Reason
@@ -282,10 +291,10 @@ function RadiologyOrder() {
               </div>
             </div>
 
-            {/* Selected Investigations Table */}
+            {/* Selected Investigations Table — now real, from the store */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-semibold text-gray-700 mb-4">
-                Selected Investigations
+                Investigations Sent — This Visit
                 <span className="ml-2 bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full">
                   {investigations.length}
                 </span>
@@ -299,12 +308,12 @@ function RadiologyOrder() {
                     <th className="pb-3 font-medium">Priority</th>
                     <th className="pb-3 font-medium">Contrast</th>
                     <th className="pb-3 font-medium">Reason</th>
-                    <th className="pb-3 font-medium w-8"></th>
+                    <th className="pb-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {investigations.map((inv, i) => (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                  {investigations.map((inv) => (
+                    <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-3 font-medium text-gray-800">{inv.type}</td>
                       <td className="py-3">
                         <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full">
@@ -317,21 +326,14 @@ function RadiologyOrder() {
                         </span>
                       </td>
                       <td className="py-3 text-gray-500 text-xs">{inv.contrast}</td>
-                      <td className="py-3 text-gray-500 text-xs max-w-40 truncate">{inv.reason}</td>
-                      <td className="py-3">
-                        <button
-                          onClick={() => handleRemove(i)}
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          🗑
-                        </button>
-                      </td>
+                      <td className="py-3 text-gray-500 text-xs max-w-40 truncate">{inv.reason || '—'}</td>
+                      <td className="py-3 text-gray-500 text-xs">{inv.status}</td>
                     </tr>
                   ))}
                   {investigations.length === 0 && (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-gray-400">
-                        No investigations added yet
+                        No investigations sent yet
                       </td>
                     </tr>
                   )}
@@ -348,12 +350,12 @@ function RadiologyOrder() {
               <div className="flex flex-col gap-3">
                 {[
                   { label: "Patient",   value: patient.name },
-                  { label: "Age/Sex",   value: patient.ageSex },
-                  { label: "Diagnosis", value: patient.diagnosis },
+                  { label: "Age/Sex",   value: `${patient.age} yrs / ${patient.gender?.charAt(0)}` },
+                  { label: "Diagnosis", value: diagnosisText },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between text-sm border-b border-gray-50 pb-2 last:border-0">
                     <span className="text-gray-400">{row.label}</span>
-                    <span className="font-medium text-gray-700 text-right">{row.value}</span>
+                    <span className="font-medium text-gray-700 text-right max-w-32">{row.value}</span>
                   </div>
                 ))}
               </div>

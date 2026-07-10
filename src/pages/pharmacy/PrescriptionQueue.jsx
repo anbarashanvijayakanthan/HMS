@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
-import StatusBadge from '../../components/common/StatusBadge'
+import { usePrescriptions, usePatients } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -10,14 +10,6 @@ const NAV_LINKS = [
   "Prescription Queue",
   "Dispense Medicine",
   "Billing",
-]
-
-const PRESCRIPTIONS = [
-  { rxId: "RX-8821", patient: "Sneha Patel",     doctor: "Dr. Sharma", medicines: "3 items", time: "11:30 AM", status: "Pending",   urgency: "Critical" },
-  { rxId: "RX-8820", patient: "Arjun Mehta",     doctor: "Dr. Sharma", medicines: "2 items", time: "10:45 AM", status: "Processing", urgency: "Medium"   },
-  { rxId: "RX-8819", patient: "Mohammed Farhan", doctor: "Dr. Kumar",  medicines: "4 items", time: "10:20 AM", status: "Ready",      urgency: "Medium"   },
-  { rxId: "RX-8818", patient: "Kavitha Rajan",   doctor: "Dr. Nair",   medicines: "1 item",  time: "09:55 AM", status: "Dispensed",  urgency: "Routine"  },
-  { rxId: "RX-8817", patient: "Aladin",          doctor: "Dr. Nair",   medicines: "1 item",  time: "09:55 AM", status: "Dispensed",  urgency: "Routine"  },
 ]
 
 const URGENCY_STYLES = {
@@ -38,6 +30,10 @@ function PrescriptionQueue() {
   const [activeLink, setActiveLink] = useState("Prescription Queue")
   const [search, setSearch] = useState("")
 
+  // ── Shared store ──
+  const { prescriptions } = usePrescriptions()
+  const patients = usePatients()
+
   const handleNavClick = (link) => {
     setActiveLink(link)
     if (link === "Dashboard")          navigate('/pharmacy')
@@ -48,8 +44,13 @@ function PrescriptionQueue() {
     if (link === "Prescription Queue") navigate('/pharmacy/prescriptions')
   }
 
-  const filtered = PRESCRIPTIONS.filter(rx =>
-    rx.patient.toLowerCase().includes(search.toLowerCase()) ||
+  const enriched = prescriptions.map(rx => ({
+    ...rx,
+    patientName: patients.find(p => p.id === rx.patientId)?.name || rx.patientId,
+  }))
+
+  const filtered = enriched.filter(rx =>
+    rx.patientName.toLowerCase().includes(search.toLowerCase()) ||
     rx.rxId.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -89,22 +90,24 @@ function PrescriptionQueue() {
                   <th className="pb-3 font-medium">Patient</th>
                   <th className="pb-3 font-medium">Doctor</th>
                   <th className="pb-3 font-medium">Medicines</th>
-                  <th className="pb-3 font-medium">Time</th>
+                  <th className="pb-3 font-medium">Date</th>
                   <th className="pb-3 font-medium">Status</th>
                   <th className="pb-3 font-medium">Urgency</th>
                   <th className="pb-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((rx, i) => (
-                  <tr key={`${rx.rxId}-${i}`} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                {filtered.map(rx => (
+                  <tr key={rx.rxId} className="border-b border-gray-50 hover:bg-gray-50 transition">
                     <td className="py-3 font-mono text-xs text-gray-500">{rx.rxId}</td>
-                    <td className="py-3 font-medium text-gray-800">{rx.patient}</td>
+                    <td className="py-3 font-medium text-gray-800">{rx.patientName}</td>
                     <td className="py-3 text-gray-500">{rx.doctor}</td>
                     <td className="py-3">
-                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">{rx.medicines}</span>
+                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                        {rx.medicines.length} items
+                      </span>
                     </td>
-                    <td className="py-3 text-gray-500">{rx.time}</td>
+                    <td className="py-3 text-gray-500 text-xs">{rx.date}</td>
                     <td className="py-3">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_STYLES[rx.status] || "bg-gray-100 text-gray-600"}`}>
                         {rx.status}
@@ -116,15 +119,26 @@ function PrescriptionQueue() {
                       </span>
                     </td>
                     <td className="py-3 text-right">
-                      <button
-                        onClick={() => navigate(`/pharmacy/dispense/${rx.rxId}`)}
-                        className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700 transition"
-                      >
-                        Process
-                      </button>
+                      {rx.status === "Dispensed" ? (
+                        <span className="text-xs text-green-600 font-medium">✓ Dispensed</span>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/pharmacy/dispense/${rx.rxId}`)}
+                          className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700 transition"
+                        >
+                          Process
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                      No prescriptions found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

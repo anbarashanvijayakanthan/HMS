@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
-
+import { useDoctors } from '../../store/hospitalStore'
 // ─── Nav ────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
   'Dashboard', 'Patients', 'Appointments', 'Doctors', 'Staff',
@@ -430,7 +430,23 @@ function Doctors() {
   const [activeLink, setActiveLink] = useState('Doctors')
   const [search, setSearch]         = useState('')
   const [showModal, setShowModal]   = useState(false)
-  const [doctors, setDoctors]       = useState(DOCTORS)
+
+  // ── Shared store — real doctors, same list Prescription/Lab Order/Diagnosis reference ──
+  const { doctors: storeDoctors, addDoctor } = useDoctors()
+
+  // Store doctors don't carry card-display fields (patientsToday, colors) —
+  // derive those here so the card UI still works without changing the store shape.
+  const doctors = storeDoctors.map((d, i) => {
+    const colorSet = ACCENT_COLORS[i % ACCENT_COLORS.length]
+    const initials = d.name.replace('Dr. ', '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    return {
+      ...d,
+      patientsToday: d.patientsToday ?? 0,
+      accentColor: colorSet.accent,
+      avatarColor: colorSet.avatar,
+      avatarText: initials || '??',
+    }
+  })
 
   const filtered = doctors.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -439,24 +455,18 @@ function Doctors() {
   )
 
   const handleAddDoctor = (form) => {
-    const colorSet = ACCENT_COLORS[doctors.length % ACCENT_COLORS.length]
-    const initials = form.fullName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-    const newDoc = {
-      id:            `D-${String(doctors.length + 1).padStart(3, '0')}`,
-      name:          form.fullName,
+    addDoctor({
+      id:            `D-${String(storeDoctors.length + 1).padStart(3, '0')}`,
+      name:          form.fullName.startsWith('Dr.') ? form.fullName : `Dr. ${form.fullName}`,
       specialty:     form.department || '—',
       qualification: form.qualification || '—',
       status:        'Active',
-      patientsToday: 0,
       experience:    form.experience ? `${form.experience} years` : '—',
       schedule:      '—',
-      accentColor:   colorSet.accent,
-      avatarColor:   colorSet.avatar,
-      avatarText:    initials || '??',
-    }
-    setDoctors(prev => [...prev, newDoc])
+    })
   }
 
+  
   return (
     <div className="min-h-screen bg-gray-50 flex">
 

@@ -17,12 +17,15 @@ src/
     doctor/
     lab/
     pharmacy/
+    admin/
   context/
     AuthContext.jsx  ← role-based auth lives here
   routes/
     ProtectedRoute.jsx
   services/
     api.js           ← all axios calls
+  store/
+    hospitalStore.jsx
 
 then one by one paste all the files code then start to ask claude to build your module with the existing component like if you are working in receptionist then how to add sidebar in receeptionist ok
 

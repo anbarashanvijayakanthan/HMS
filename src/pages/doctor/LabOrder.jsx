@@ -1,34 +1,31 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
+import { useVisit, useDiagnoses, useLabOrders } from '../../store/hospitalStore'
+import { useAuth } from '../../context/AuthContext'
 
 const NAV_LINKS = [
   "Dashboard", "Patient Consultation", "Diagnosis",
   "Prescription", "Lab Order", "Radiology Order", "Follow-up Manager",
 ]
 
-const MOCK_PATIENTS = {
-  "T-009": { name: "Sneha Patel", ageSex: "31 yrs / F", id: "P-1004", diagnosis: "HTN, Arrhythmia" },
-  "T-010": { name: "Rajesh Verma", ageSex: "56 yrs / M", id: "P-1045", diagnosis: "Hypertension" },
-}
-
 const ALL_TESTS = [
-  { name: "Lipid Profile",              category: "Biochemistry"    },
-  { name: "Troponin I (hs)",            category: "Cardiac Markers" },
-  { name: "Thyroid Profile (T3/T4/TSH)",category: "Hormones"        },
-  { name: "Complete Blood Count (CBC)", category: "Haematology"     },
-  { name: "HbA1c",                      category: "Biochemistry"    },
-  { name: "Liver Function Test (LFT)",  category: "Biochemistry"    },
-  { name: "Renal Function Test (RFT)",  category: "Biochemistry"    },
-  { name: "Urine Routine",              category: "Microbiology"    },
-  { name: "Blood Culture",              category: "Microbiology"    },
-  { name: "CRP",                        category: "Cardiac Markers" },
-  { name: "D-Dimer",                    category: "Cardiac Markers" },
-  { name: "PT/INR",                     category: "Coagulation"     },
-  { name: "APTT",                       category: "Coagulation"     },
-  { name: "ESR",                        category: "Haematology"     },
-  { name: "Peripheral Smear",           category: "Haematology"     },
-  { name: "Cortisol",                   category: "Hormones"        },
+  { name: "Lipid Profile", category: "Biochemistry" },
+  { name: "Troponin I (hs)", category: "Cardiac Markers" },
+  { name: "Thyroid Profile (T3/T4/TSH)", category: "Hormones" },
+  { name: "Complete Blood Count (CBC)", category: "Haematology" },
+  { name: "HbA1c", category: "Biochemistry" },
+  { name: "Liver Function Test (LFT)", category: "Biochemistry" },
+  { name: "Renal Function Test (RFT)", category: "Biochemistry" },
+  { name: "Urine Routine", category: "Microbiology" },
+  { name: "Blood Culture", category: "Microbiology" },
+  { name: "CRP", category: "Cardiac Markers" },
+  { name: "D-Dimer", category: "Cardiac Markers" },
+  { name: "PT/INR", category: "Coagulation" },
+  { name: "APTT", category: "Coagulation" },
+  { name: "ESR", category: "Haematology" },
+  { name: "Peripheral Smear", category: "Haematology" },
+  { name: "Cortisol", category: "Hormones" },
 ]
 
 const CATEGORIES = [
@@ -38,31 +35,30 @@ const CATEGORIES = [
 
 const PRIORITIES = ["Routine", "Urgent", "STAT"]
 
+let loCounter = 5502 // demo-only incrementing id; real backend would assign this
+
 function LabOrder() {
   const { token } = useParams()
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Lab Order")
 
-  const patient = MOCK_PATIENTS[token] || {
-    name: "Unknown", ageSex: "--", id: "--", diagnosis: "--",
-  }
+  // ── Shared store ──
+  const { visit, patient } = useVisit(token)
+  const { diagnoses } = useDiagnoses(patient?.id)
+  const { createLabOrder } = useLabOrders()
 
-  const [search,      setSearch]      = useState('')
+  const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
-  const [selectedTests, setSelectedTests]   = useState([
-    { name: "Lipid Profile",               priority: "Urgent"  },
-    { name: "Troponin I (hs)",             priority: "Routine" },
-    { name: "Thyroid Profile (T3/T4/TSH)", priority: "Routine" },
-    { name: "Complete Blood Count (CBC)",  priority: "Routine" },
-  ])
-  const [urgency,  setUrgency]  = useState('')
+  const [selectedTests, setSelectedTests] = useState([])
+  const [urgency, setUrgency] = useState('')
+  const [fasting, setFasting] = useState('No')
   const [labNotes, setLabNotes] = useState('')
-
-  // Filtered test list
+  const [sent, setSent] = useState(false)
+  const { user } = useAuth()
   const filtered = ALL_TESTS.filter(t => {
-    const matchCat    = activeCategory === 'All' || t.category === activeCategory
+    const matchCat = activeCategory === 'All' || t.category === activeCategory
     const matchSearch = t.name.toLowerCase().includes(search.toLowerCase())
-    const notAdded    = !selectedTests.find(s => s.name === t.name)
+    const notAdded = !selectedTests.find(s => s.name === t.name)
     return matchCat && matchSearch && notAdded
   })
 
@@ -80,20 +76,53 @@ function LabOrder() {
     )
   }
 
+  const handleSendToLab = () => {
+    if (!patient || selectedTests.length === 0) return
+    loCounter += 1
+    createLabOrder({
+      orderId: `LO-${loCounter}`,
+      patientId: patient.id,
+      token,
+      doctor: `Dr. ${user?.name}`,
+      tests: selectedTests.map(t => ({ name: t.name, priority: t.priority })),
+      priority: urgency || "Routine",
+      ordered: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      status: "Pending",
+      fasting: fasting === "Yes" ? "Yes — 12 hours" : "No",
+    })
+    setSent(true)
+  }
+
   const handleNavClick = (link) => {
     setActiveLink(link)
-    if (link === "Dashboard")            navigate('/doctor')
+    if (link === "Dashboard") navigate('/doctor')
     if (link === "Patient Consultation") navigate(`/doctor/consultation/${token}`)
-    if (link === "Diagnosis")            navigate(`/doctor/diagnosis/${token}`)
-    if (link === "Prescription")         navigate(`/doctor/prescription/${token}`)
-    if (link === "Radiology Order")      navigate(`/doctor/radiology-order/${token}`)
+    if (link === "Diagnosis") navigate(`/doctor/diagnosis/${token}`)
+    if (link === "Prescription") navigate(`/doctor/prescription/${token}`)
+    if (link === "Radiology Order") navigate(`/doctor/radiology-order/${token}`)
+    if (link === "Follow-up Manager") navigate(`/doctor/followup/${token}`)
   }
 
   const priorityStyle = {
     Routine: "bg-gray-100 text-gray-600",
-    Urgent:  "bg-orange-100 text-orange-600",
-    STAT:    "bg-red-100 text-red-600",
+    Urgent: "bg-orange-100 text-orange-600",
+    STAT: "bg-red-100 text-red-600",
   }
+
+  if (!patient || !visit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <p className="text-gray-500">No patient found for token "{token}".</p>
+        </main>
+      </div>
+    )
+  }
+
+  const diagnosisText = diagnoses.length > 0
+    ? diagnoses.map(d => d.name).join(', ')
+    : "No diagnosis recorded"
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -123,7 +152,6 @@ function LabOrder() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-semibold text-gray-700 mb-4">Search & Add Tests</h3>
 
-              {/* Search */}
               <div className="flex gap-2 mb-4">
                 <input
                   value={search}
@@ -136,7 +164,6 @@ function LabOrder() {
                 </button>
               </div>
 
-              {/* Category Chips */}
               <div className="flex flex-wrap gap-2 mb-4">
                 {CATEGORIES.map(cat => (
                   <button
@@ -153,7 +180,6 @@ function LabOrder() {
                 ))}
               </div>
 
-              {/* Test Results to Add */}
               {(search || activeCategory !== 'All') && filtered.length > 0 && (
                 <div className="border border-gray-100 rounded-lg overflow-hidden mb-2">
                   {filtered.slice(0, 6).map(t => (
@@ -227,7 +253,7 @@ function LabOrder() {
               </table>
             </div>
 
-            {/* Clinical Urgency + Notes */}
+            {/* Clinical Urgency + Fasting + Notes */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
 
               <div className="mb-4">
@@ -251,6 +277,26 @@ function LabOrder() {
                 </div>
               </div>
 
+              <div className="mb-4">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                  Fasting Required?
+                </label>
+                <div className="flex gap-4">
+                  {['Yes', 'No'].map(opt => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="fasting"
+                        checked={fasting === opt}
+                        onChange={() => setFasting(opt)}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="mb-5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
                   Clinical Notes for Lab
@@ -264,8 +310,13 @@ function LabOrder() {
                 />
               </div>
 
+              {sent && (
+                <p className="text-sm text-green-600 mb-3">✓ Lab order sent.</p>
+              )}
+
               <div className="flex justify-end">
                 <button
+                  onClick={handleSendToLab}
                   disabled={selectedTests.length === 0}
                   className="bg-gray-800 text-white text-sm px-6 py-2.5 rounded-lg hover:bg-gray-700 transition disabled:opacity-40 flex items-center gap-2"
                 >
@@ -282,9 +333,9 @@ function LabOrder() {
               <h3 className="font-semibold text-gray-700 mb-4">Patient Info</h3>
               <div className="flex flex-col gap-3">
                 {[
-                  { label: "Patient",   value: patient.name },
-                  { label: "Age/Sex",   value: patient.ageSex },
-                  { label: "Diagnosis", value: patient.diagnosis },
+                  { label: "Patient", value: patient.name },
+                  { label: "Age/Sex", value: `${patient.age} yrs / ${patient.gender?.charAt(0)}` },
+                  { label: "Diagnosis", value: diagnosisText },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between text-sm border-b border-gray-50 pb-2 last:border-0">
                     <span className="text-gray-400">{row.label}</span>

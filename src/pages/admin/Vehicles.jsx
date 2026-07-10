@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
-
+import { useVehicles } from '../../store/hospitalStore'
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
   'Dashboard', 'Patients', 'Appointments', 'Doctors', 'Staff',
@@ -10,56 +10,6 @@ const NAV_LINKS = [
 ]
 
 // ─── Mock vehicle data ────────────────────────────────────────────────────────
-const VEHICLES = [
-  {
-    id: 'V-001', reg: 'KL 07 AB 1234', type: 'Ambulance', status: 'Available',
-    driver: 'Ravi Kumar', insurance: '31 Aug 2026',
-    permitExpiry: '30 Jun 2026', nextService: '01 Aug 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-002', reg: 'KL 07 AB 1234', type: 'Ambulance', status: 'Available',
-    driver: 'Ravi Kumar', insurance: '31 Aug 2026',
-    permitExpiry: '30 Jun 2026', nextService: '01 Aug 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-003', reg: 'KL 07 CD 9012', type: 'Staff Van', status: 'Available',
-    driver: 'Murugan P', insurance: '22 Jul 2026',
-    permitExpiry: '20 Jun 2026', nextService: '05 Jul 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-004', reg: 'KL 07 EF 3456', type: 'Doctor Car', status: 'Maintenance',
-    driver: 'Joseph M', insurance: '10 Feb 2027',
-    permitExpiry: '28 Feb 2027', nextService: '16 Sep 2026',
-    permitAlert: false,
-  },
-  {
-    id: 'V-005', reg: 'KL 07 AB 1234', type: 'Ambulance', status: 'Available',
-    driver: 'Ravi Kumar', insurance: '31 Aug 2026',
-    permitExpiry: '30 Jun 2026', nextService: '01 Aug 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-006', reg: 'KL 07 AB 1234', type: 'Ambulance', status: 'Available',
-    driver: 'Ravi Kumar', insurance: '31 Aug 2026',
-    permitExpiry: '30 Jun 2026', nextService: '01 Aug 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-007', reg: 'KL 07 CD 9012', type: 'Staff Van', status: 'Available',
-    driver: 'Murugan P', insurance: '22 Jul 2026',
-    permitExpiry: '20 Jun 2026', nextService: '05 Jul 2026',
-    permitAlert: true,
-  },
-  {
-    id: 'V-008', reg: 'KL 07 EF 3456', type: 'Doctor Car', status: 'Maintenance',
-    driver: 'Joseph M', insurance: '10 Feb 2027',
-    permitExpiry: '28 Feb 2027', nextService: '16 Sep 2026',
-    permitAlert: false,
-  },
-]
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 function AdminTopBar({ breadcrumb, search, onSearch }) {
@@ -117,9 +67,9 @@ function VehicleStatCard({ iconBg, icon, label, value }) {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function VehicleBadge({ status }) {
   const s = {
-    'Available':   'bg-green-100 text-green-700',
+    'Available': 'bg-green-100 text-green-700',
     'Maintenance': 'bg-orange-100 text-orange-600',
-    'In Use':      'bg-blue-100 text-blue-700',
+    'In Use': 'bg-blue-100 text-blue-700',
   }
   return (
     <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full
@@ -186,7 +136,7 @@ function VehicleCard({ vehicle }) {
                            hover:text-gray-700 transition">
           Log
         </button>
-      
+
       </div>
     </div>
   )
@@ -194,10 +144,12 @@ function VehicleCard({ vehicle }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function Vehicles() {
-  const navigate              = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState('Vehicles')
-  const [search, setSearch]         = useState('')
-  const [vehicles, setVehicles]     = useState(VEHICLES)
+  const [search, setSearch] = useState('')
+
+  // ── Shared store ──
+  const { vehicles } = useVehicles()
 
   const filtered = vehicles.filter(v =>
     v.type.toLowerCase().includes(search.toLowerCase()) ||
@@ -205,12 +157,11 @@ function Vehicles() {
     v.driver.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Stats derived from data
-  const totalVehicles    = vehicles.length
-  const availableCount   = vehicles.filter(v => v.status === 'Available').length
+  // Stats derived from real data
+  const totalVehicles = vehicles.length
+  const availableCount = vehicles.filter(v => v.status === 'Available').length
   const maintenanceCount = vehicles.filter(v => v.status === 'Maintenance').length
-  const activeDrivers    = 18 
-   // static as per Figma
+  const activeDrivers = new Set(vehicles.map(v => v.driver)).size
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -221,10 +172,10 @@ function Vehicles() {
         onLinkClick={(link) => {
           setActiveLink(link)
           if (link === 'Dashboard') navigate('/admin')
-          if (link === 'Doctors')   navigate('/admin/doctors')
-          if (link === 'Staff')     navigate('/admin/staff')
-          if (link === 'IP')        navigate('/admin/ip')
-          if (link === 'Vehicles')  navigate('/admin/vehicles')
+          if (link === 'Doctors') navigate('/admin/doctors')
+          if (link === 'Staff') navigate('/admin/staff')
+          if (link === 'IP') navigate('/admin/ip')
+          if (link === 'Vehicles') navigate('/admin/vehicles')
         }}
       />
 
@@ -239,8 +190,11 @@ function Vehicles() {
               <h2 className="text-2xl font-bold text-gray-800">Vehicle Management</h2>
               <p className="text-sm text-gray-400 mt-0.5">Manage and view prescriptions</p>
             </div>
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700
-                               text-white text-sm font-medium px-4 py-2.5 rounded-lg transition">
+            <button
+              onClick={() => navigate('/admin/add-vehicle')}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700
+                               text-white text-sm font-medium px-4 py-2.5 rounded-lg transition"
+            >
               <span className="text-base font-bold leading-none">+</span>
               Add Vehicle
             </button>

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
-import StatusBadge from '../../components/common/StatusBadge'
+import { useLabOrders, usePatients } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Lab Dashboard",
@@ -10,58 +11,6 @@ const NAV_LINKS = [
   "Sample Collection",
   "Result Entry",
   "Reports Management",
-]
-
-const PENDING_ORDERS = [
-  {
-    orderId: "LO-5581",
-    patient: "Sneha Patel",
-    doctor: "Dr. Sharma",
-    tests: "CBC, Lipid, Troponin, T3",
-    priority: "STAT",
-    ordered: "11:35 AM",
-    status: "Pending",
-  },
-  {
-    orderId: "LO-5580",
-    patient: "Arjun Mehta",
-    doctor: "Dr. Sharma",
-    tests: "CBC, CRP, ESR",
-    priority: "Urgent",
-    ordered: "10:50 AM",
-    status: "Processing",
-  },
-  {
-    orderId: "LO-5499",
-    patient: "Mohammed Farhan",
-    doctor: "Dr. Kumar",
-    tests: "LFT, RFT, HbA1c",
-    priority: "Routine",
-    ordered: "10:20 AM",
-    status: "Sample Collected",
-  },
-  {
-    orderId: "LO-5495",
-    patient: "Anita Desai",
-    doctor: "Dr. Kumar",
-    tests: "D-Dimer, PT/INR, APTT",
-    priority: "Routine",
-    ordered: "09:00 AM",
-    status: "Pending",
-  },
-]
-
-const STAT_ALERTS = [
-  {
-    patient: "Sneha Patel",
-    tests: "Troponin I (hs)",
-    waiting: "Waiting: 35 min",
-  },
-  {
-    patient: "Anita Desai",
-    tests: "D-Dimer, PT/INR",
-    waiting: "Waiting: 45 min",
-  },
 ]
 
 const PRIORITY_STYLES = {
@@ -95,14 +44,37 @@ function LabStatusBadge({ status }) {
 
 function LabDashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Lab Dashboard")
   const [search, setSearch] = useState('')
 
-  const filtered = PENDING_ORDERS.filter(o =>
-    o.patient.toLowerCase().includes(search.toLowerCase()) ||
+  // ── Shared store ──
+  const { labOrders } = useLabOrders()
+  const patients = usePatients()
+
+  const enriched = labOrders.map(o => ({
+    ...o,
+    patientName: patients.find(p => p.id === o.patientId)?.name || o.patientId,
+    testsText: o.tests.map(t => t.name).join(', '),
+  }))
+
+  const pendingOrders = enriched.filter(o => o.status !== "Completed")
+  const filtered = pendingOrders.filter(o =>
+    o.patientName.toLowerCase().includes(search.toLowerCase()) ||
     o.orderId.toLowerCase().includes(search.toLowerCase()) ||
-    o.tests.toLowerCase().includes(search.toLowerCase())
+    o.testsText.toLowerCase().includes(search.toLowerCase())
   )
+
+  const statAlerts = enriched.filter(o => o.priority === "STAT" && o.status !== "Completed")
+
+  const handleNavClick = (link) => {
+    setActiveLink(link)
+    if (link === "Lab Dashboard")       navigate('/lab')
+    if (link === "Test Order")          navigate('/lab/test-order')
+    if (link === "Sample Collection")   navigate('/lab/sample-collection')
+    if (link === "Result Entry")        navigate('/lab/result-entry')
+    if (link === "Reports Management")  navigate('/lab/reports')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -110,7 +82,7 @@ function LabDashboard() {
       <Sidebar
         links={NAV_LINKS}
         activeLink={activeLink}
-        onLinkClick={setActiveLink}
+        onLinkClick={handleNavClick}
       />
 
       <main className="flex-1 p-6 overflow-auto">
@@ -125,12 +97,12 @@ function LabDashboard() {
           </div>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row — derived from the store */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="🧪" label="Tests Today"        value={64} />
-          <StatsCard icon="⏳" label="Pending"            value={18} />
-          <StatsCard icon="✅" label="Completed"          value={46} />
-          <StatsCard icon="📄" label="Reports Generated"  value={41} />
+          <StatsCard icon="🧪" label="Total Orders"      value={labOrders.length} />
+          <StatsCard icon="⏳" label="Pending"            value={labOrders.filter(o => o.status === "Pending").length} />
+          <StatsCard icon="✅" label="Completed"          value={labOrders.filter(o => o.status === "Completed").length} />
+          <StatsCard icon="⚠️" label="STAT Orders"        value={statAlerts.length} subColor="text-red-500" />
         </div>
 
         {/* Pending Test Orders */}
@@ -138,7 +110,7 @@ function LabDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-700">Pending Test Orders</h3>
             <span className="bg-orange-100 text-orange-600 text-xs font-medium px-2.5 py-1 rounded-full">
-              18 Pending
+              {pendingOrders.length} Pending
             </span>
           </div>
 
@@ -177,14 +149,21 @@ function LabDashboard() {
                     className="border-b border-gray-50 hover:bg-gray-50 transition"
                   >
                     <td className="py-3 font-mono text-xs text-gray-500">{order.orderId}</td>
-                    <td className="py-3 font-medium text-gray-800">{order.patient}</td>
+                    <td className="py-3 font-medium text-gray-800">{order.patientName}</td>
                     <td className="py-3 text-gray-500">{order.doctor}</td>
-                    <td className="py-3 text-gray-600 max-w-48 truncate">{order.tests}</td>
+                    <td className="py-3 text-gray-600 max-w-48 truncate">{order.testsText}</td>
                     <td className="py-3"><PriorityBadge priority={order.priority} /></td>
                     <td className="py-3 text-gray-500">{order.ordered}</td>
                     <td className="py-3"><LabStatusBadge status={order.status} /></td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-400 text-sm">
+                      No pending orders
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -194,24 +173,27 @@ function LabDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-xl">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-orange-500">⚠</span>
-            <h3 className="font-semibold text-gray-700">STAT / Urgent Tests</h3>
+            <h3 className="font-semibold text-gray-700">STAT Tests</h3>
           </div>
           <div className="flex flex-col gap-3">
-            {STAT_ALERTS.map((alert, i) => (
+            {statAlerts.map((alert) => (
               <div
-                key={i}
+                key={alert.orderId}
                 className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3 flex items-center justify-between"
               >
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{alert.patient}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{alert.tests}</p>
-                  <p className="text-xs text-orange-500 mt-0.5">{alert.waiting}</p>
+                  <p className="text-sm font-semibold text-gray-800">{alert.patientName}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{alert.testsText}</p>
+                  <p className="text-xs text-orange-500 mt-0.5">Ordered: {alert.ordered}</p>
                 </div>
                 <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">
                   STAT
                 </span>
               </div>
             ))}
+            {statAlerts.length === 0 && (
+              <p className="text-sm text-gray-400">No STAT orders right now</p>
+            )}
           </div>
         </div>
 

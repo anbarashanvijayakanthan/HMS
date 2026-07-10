@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
+import { useLabOrders, usePatients, useLabResults } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Lab Dashboard",
@@ -11,60 +13,10 @@ const NAV_LINKS = [
   "Reports Management",
 ]
 
-const REPORTS = [
-  {
-    reportId: "RPT-6601",
-    patient:  "Sneha Patel",
-    tests:    "CBC, Lipid, Troponin, TS",
-    generated:"19 Jun  14:38",
-    doctor:   "Dr. Sharma",
-    abnormal: true,
-    delivery: "Pending",
-  },
-  {
-    reportId: "RPT-6600",
-    patient:  "Arjun Mehta",
-    tests:    "CBC, CRP, ESR",
-    generated:"19 Jun  13:15",
-    doctor:   "Dr. Sharma",
-    abnormal: false,
-    delivery: "Sent",
-  },
-  {
-    reportId: "RPT-6599",
-    patient:  "Mohammed Farhan",
-    tests:    "LFT, RFT, HbA1c",
-    generated:"19 Jun  12:48",
-    doctor:   "Dr. Kumar",
-    abnormal: true,
-    delivery: "Sent",
-  },
-  {
-    reportId: "RPT-6598",
-    patient:  "Kavitha Rajan",
-    tests:    "TSH, T3, T4",
-    generated:"19 Jun  11:55",
-    doctor:   "Dr. Nair",
-    abnormal: false,
-    delivery: "Sent",
-  },
-  {
-    reportId: "RPT-6597",
-    patient:  "Vikram Nair",
-    tests:    "Calcium, Vit D3, Uric Ac",
-    generated:"19 Jun  11:28",
-    doctor:   "Dr. Nair",
-    abnormal: true,
-    delivery: "Sent",
-  },
-]
-
 function DeliveryBadge({ status }) {
   return (
     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-      status === "Sent"
-        ? "bg-green-100 text-green-600"
-        : "bg-orange-100 text-orange-500"
+      status === "Sent" ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-500"
     }`}>
       {status}
     </span>
@@ -85,14 +37,48 @@ function AbnormalBadge({ abnormal }) {
 
 function ReportsManagement() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Reports Management")
   const [search, setSearch] = useState('')
 
-  const filtered = REPORTS.filter(r =>
+  // ── Shared store ──
+  const { labOrders } = useLabOrders()
+  const patients = usePatients()
+  const { labResults, updateDelivery } = useLabResults()
+
+  // A "report" only exists once a result has been saved for that order
+  const reports = Object.entries(labResults).map(([orderId, result]) => {
+    const order = labOrders.find(o => o.orderId === orderId)
+    const patient = patients.find(p => p.id === result.patientId)
+    return {
+      reportId: orderId,
+      patient: patient?.name || result.patientId,
+      tests: result.testsText,
+      generated: result.generatedAt,
+      doctor: result.doctor,
+      abnormal: result.abnormal,
+      delivery: result.delivery,
+    }
+  })
+
+  const handleNavClick = (link) => {
+    setActiveLink(link)
+    if (link === "Lab Dashboard")       navigate('/lab')
+    if (link === "Test Order")          navigate('/lab/test-order')
+    if (link === "Sample Collection")   navigate('/lab/sample-collection')
+    if (link === "Result Entry")        navigate('/lab/result-entry')
+    if (link === "Reports Management")  navigate('/lab/reports')
+  }
+
+  const filtered = reports.filter(r =>
     r.patient.toLowerCase().includes(search.toLowerCase()) ||
     r.reportId.toLowerCase().includes(search.toLowerCase()) ||
     r.tests.toLowerCase().includes(search.toLowerCase())
   )
+
+  const sentCount = reports.filter(r => r.delivery === "Sent").length
+  const pendingCount = reports.filter(r => r.delivery === "Pending").length
+  const abnormalCount = reports.filter(r => r.abnormal).length
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -100,7 +86,7 @@ function ReportsManagement() {
       <Sidebar
         links={NAV_LINKS}
         activeLink={activeLink}
-        onLinkClick={setActiveLink}
+        onLinkClick={handleNavClick}
       />
 
       <main className="flex-1 p-6 overflow-auto">
@@ -118,12 +104,12 @@ function ReportsManagement() {
           <p className="text-sm text-gray-400">View, download and send lab reports</p>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row — derived from real saved results */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="📄" label="Reports Today"    value={41} />
-          <StatsCard icon="📤" label="Sent to Doctors"  value={38} />
-          <StatsCard icon="⏳" label="Pending Delivery" value={3}  />
-          <StatsCard icon="🔴" label="Flagged Abnormal" value={12} />
+          <StatsCard icon="📄" label="Reports Total"    value={reports.length} />
+          <StatsCard icon="📤" label="Sent to Doctors"  value={sentCount} />
+          <StatsCard icon="⏳" label="Pending Delivery" value={pendingCount}  />
+          <StatsCard icon="🔴" label="Flagged Abnormal" value={abnormalCount} subColor="text-red-500" />
         </div>
 
         {/* Table Card */}
@@ -176,13 +162,27 @@ function ReportsManagement() {
                         <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition">
                           👁 View
                         </button>
-                        <button className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition">
-                          ➤ Send
-                        </button>
+                        {r.delivery === "Pending" ? (
+                          <button
+                            onClick={() => updateDelivery(r.reportId, "Sent")}
+                            className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition"
+                          >
+                            ➤ Send
+                          </button>
+                        ) : (
+                          <span className="text-xs text-green-600 font-medium">✓ Sent</span>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                      No reports yet — complete a result entry first
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

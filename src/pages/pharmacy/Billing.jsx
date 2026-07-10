@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
+import { useBills, usePatients } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -11,13 +12,6 @@ const NAV_LINKS = [
   "Prescription Queue",
   "Dispense Medicine",
   "Billing",
-]
-
-const BILLS = [
-  { billId: "PB-4501", patient: "Sneha Patel",     items: 3, gross: 665,  discount: 0,  net: 665,  mode: "Cash"      },
-  { billId: "PB-4500", patient: "Arjun Mehta",     items: 2, gross: 380,  discount: 38, net: 342,  mode: "Card"      },
-  { billId: "PB-4499", patient: "Mohammed Farhan", items: 4, gross: 1240, discount: 0,  net: 1240, mode: "Insurance" },
-  { billId: "PB-4498", patient: "Kavitha Rajan",   items: 1, gross: 220,  discount: 0,  net: 220,  mode: "UPI"       },
 ]
 
 const MODE_STYLES = {
@@ -33,6 +27,10 @@ function Billing() {
   const [activeLink, setActiveLink] = useState("Billing")
   const [search, setSearch] = useState("")
 
+  // ── Shared store ──
+  const { bills } = useBills()
+  const patients = usePatients()
+
   const handleNavClick = (link) => {
     setActiveLink(link)
     if (link === "Dashboard")          navigate('/pharmacy')
@@ -43,10 +41,22 @@ function Billing() {
     if (link === "Billing")            navigate('/pharmacy/billing')
   }
 
-  const filteredBills = BILLS.filter(b =>
-    b.patient.toLowerCase().includes(search.toLowerCase()) ||
+  const enriched = bills.map(b => ({
+    ...b,
+    patientName: patients.find(p => p.id === b.patientId)?.name || b.patientId,
+  }))
+
+  const filteredBills = enriched.filter(b =>
+    b.patientName.toLowerCase().includes(search.toLowerCase()) ||
     b.billId.toLowerCase().includes(search.toLowerCase())
   )
+
+  // Derived stats — real, from the store
+  const todaysRevenue = bills.reduce((sum, b) => sum + (b.net || 0), 0)
+  const billsRaised = bills.length
+  const insuranceTotal = bills.filter(b => b.mode === "Insurance").reduce((sum, b) => sum + (b.net || 0), 0)
+  const pendingTotal = bills.filter(b => b.status === "Partial" || b.status === "Pending")
+    .reduce((sum, b) => sum + (b.net || 0), 0)
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -60,12 +70,12 @@ function Billing() {
           <p className="text-sm text-gray-400">Create bills for OTC and prescription medicines</p>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row — now derived from real bills */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="💲" label="Today's Revenue"   value="₹24,680" />
-          <StatsCard icon="📄" label="Bills Raised"      value={38} />
-          <StatsCard icon="💳" label="Insurance Claims"  value="₹8,200" />
-          <StatsCard icon="⏰" label="Pending"           value="₹1,450" />
+          <StatsCard icon="💲" label="Total Revenue"     value={`₹${todaysRevenue.toLocaleString('en-IN')}`} />
+          <StatsCard icon="📄" label="Bills Raised"      value={billsRaised} />
+          <StatsCard icon="💳" label="Insurance Claims"  value={`₹${insuranceTotal.toLocaleString('en-IN')}`} />
+          <StatsCard icon="⏰" label="Pending"           value={`₹${pendingTotal.toLocaleString('en-IN')}`} />
         </div>
 
         {/* Bills Table */}
@@ -102,7 +112,7 @@ function Billing() {
                 {filteredBills.map(b => (
                   <tr key={b.billId} className="border-b border-gray-50 hover:bg-gray-50 transition">
                     <td className="py-3 font-mono text-xs text-gray-500">{b.billId}</td>
-                    <td className="py-3 font-medium text-gray-800">{b.patient}</td>
+                    <td className="py-3 font-medium text-gray-800">{b.patientName}</td>
                     <td className="py-3 text-gray-500">{b.items} items</td>
                     <td className="py-3 text-gray-700">₹{b.gross}</td>
                     <td className={`py-3 ${b.discount > 0 ? "text-green-500" : "text-gray-400"}`}>
@@ -120,6 +130,13 @@ function Billing() {
                     </td>
                   </tr>
                 ))}
+                {filteredBills.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                      No bills found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

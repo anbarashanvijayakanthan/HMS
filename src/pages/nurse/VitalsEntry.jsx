@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useVisit, useVitals } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -9,36 +10,6 @@ const NAV_LINKS = [
   "Vitals Entry",
   "Vitals History",
 ]
-
-// Mock patient lookup
-const MOCK_PATIENTS = {
-  "T-008": {
-    name: "Mohammed Farhan",
-    id: "P-1003",
-    age: "45 years",
-    gender: "Male",
-    department: "General OPD",
-    allergies: ["Penicillin"],
-    blood: "O+",
-    lastBP: "138/88",
-    lastWeight: "74 kg",
-    lastGlucose: "112 mg/dL",
-    lastVisit: "15 Jun 2025",
-  },
-  "T-009": {
-    name: "Sneha Patel",
-    id: "P-1045",
-    age: "31 years",
-    gender: "Female",
-    department: "Cardiology",
-    allergies: [],
-    blood: "B+",
-    lastBP: "120/80",
-    lastWeight: "58 kg",
-    lastGlucose: "90 mg/dL",
-    lastVisit: "10 Jun 2025",
-  },
-}
 
 const NORMAL_RANGES = [
   { label: "Blood Pressure",  value: "90–120 / 60–80" },
@@ -54,10 +25,18 @@ function VitalsEntry() {
   const navigate   = useNavigate()
   const [activeLink, setActiveLink] = useState("Vitals Entry")
 
-  // Patient search
-  const [tokenInput, setTokenInput]   = useState('')
-  const [patient, setPatient]         = useState(null)
+  // Token can arrive via ?token=T-008 (from the nurse dashboard "Record" button)
+  // or be typed/searched manually below.
+  const [searchParams] = useSearchParams()
+  const tokenFromUrl = searchParams.get('token') || ''
+
+  const [tokenInput, setTokenInput]   = useState(tokenFromUrl)
+  const [activeToken, setActiveToken] = useState(tokenFromUrl)
   const [searchError, setSearchError] = useState('')
+
+  // ── Shared store lookups ──
+  const { visit, patient } = useVisit(activeToken)
+  const { vitals: existingVitals, saveVitals } = useVitals(activeToken)
 
   // Vitals form
   const [vitals, setVitals] = useState({
@@ -73,6 +52,7 @@ function VitalsEntry() {
     consciousness: '',
     complaints: '',
   })
+  const [saved, setSaved] = useState(false)
 
   const bmi =
     vitals.height && vitals.weight
@@ -81,18 +61,33 @@ function VitalsEntry() {
 
   const handleSearch = () => {
     const key = tokenInput.trim().toUpperCase()
-    const found = MOCK_PATIENTS[key]
-    if (found) {
-      setPatient(found)
-      setSearchError('')
-    } else {
-      setPatient(null)
-      setSearchError('No patient found for this token / ID.')
-    }
+    setActiveToken(key)
+    setSaved(false)
+    // useVisit will resolve on next render; give immediate feedback here
+    setSearchError('')
   }
 
   const handleChange = (field, value) => {
     setVitals(prev => ({ ...prev, [field]: value }))
+    setSaved(false)
+  }
+
+  const handleSave = (flagCritical = false) => {
+    if (!activeToken || !patient) {
+      setSearchError('Search for a valid patient/token before saving vitals.')
+      return
+    }
+    saveVitals({
+      bpSys: vitals.bpSys, bpDia: vitals.bpDia,
+      temp: vitals.temp, pulse: vitals.pulse, spo2: vitals.spo2,
+      respRate: vitals.respRate, glucose: vitals.glucose,
+      height: vitals.height, weight: vitals.weight,
+      painScale: vitals.painScale, consciousness: vitals.consciousness,
+      complaints: vitals.complaints,
+      recordedBy: user?.name || 'Nurse',
+      critical: flagCritical,
+    })
+    setSaved(true)
   }
 
   const handleNavClick = (link) => {
@@ -105,11 +100,7 @@ function VitalsEntry() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      <Sidebar
-        links={NAV_LINKS}
-        activeLink={activeLink}
-        onLinkClick={handleNavClick}
-      />
+      <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
 
       <main className="flex-1 p-6 overflow-auto">
 
@@ -162,7 +153,11 @@ function VitalsEntry() {
                 <p className="text-xs text-red-500 mb-3">{searchError}</p>
               )}
 
-              {patient && (
+              {activeToken && !patient && !searchError && (
+                <p className="text-xs text-red-500 mb-3">No patient found for token "{activeToken}".</p>
+              )}
+
+              {patient && visit && (
                 <div className="flex items-start gap-3 bg-blue-50 rounded-lg p-3">
                   <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
                     {patient.name.charAt(0)}
@@ -170,13 +165,11 @@ function VitalsEntry() {
                   <div>
                     <p className="font-semibold text-gray-800 text-sm">{patient.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {patient.id} · {patient.age} · {patient.gender} · {patient.department}
+                      {patient.id} · {patient.age} yrs · {patient.gender} · {visit.department}
                     </p>
                     <p className="text-xs mt-1">
                       {patient.allergies.length > 0 && (
-                        <>Allergies: {patient.allergies.map((a, i) => (
-                          <span key={i} className="text-red-500 font-medium">{a}</span>
-                        ))} · </>
+                        <>Allergies: <span className="text-red-500 font-medium">{patient.allergies.join(', ')}</span> · </>
                       )}
                       Blood: {patient.blood}
                     </p>
@@ -198,26 +191,26 @@ function VitalsEntry() {
               </div>
             </div>
 
-            {/* Previous Vitals */}
-            {patient && (
+            {/* Previous Vitals — from the store, if already recorded today */}
+            {existingVitals && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <h3 className="font-semibold text-gray-700 mb-3">Previous Vitals</h3>
+                <h3 className="font-semibold text-gray-700 mb-3">Already Recorded Today</h3>
                 <div className="flex flex-col gap-2.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Last BP</span>
-                    <span className="text-orange-500 font-semibold">{patient.lastBP}</span>
+                    <span className="text-gray-500">BP</span>
+                    <span className="text-orange-500 font-semibold">{existingVitals.bpSys}/{existingVitals.bpDia}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Last Weight</span>
-                    <span className="font-semibold text-gray-800">{patient.lastWeight}</span>
+                    <span className="text-gray-500">Weight</span>
+                    <span className="font-semibold text-gray-800">{existingVitals.weight} kg</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Last Glucose</span>
-                    <span className="text-orange-500 font-semibold">{patient.lastGlucose}</span>
+                    <span className="text-gray-500">Recorded at</span>
+                    <span className="font-semibold text-gray-800">{existingVitals.timestamp}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Last Visit</span>
-                    <span className="font-semibold text-gray-800">{patient.lastVisit}</span>
+                    <span className="text-gray-500">By</span>
+                    <span className="font-semibold text-gray-800">{existingVitals.recordedBy}</span>
                   </div>
                 </div>
               </div>
@@ -232,7 +225,6 @@ function VitalsEntry() {
 
             {/* Row 1: BP / Temp / Pulse */}
             <div className="grid grid-cols-3 gap-4 mb-5">
-              {/* Blood Pressure */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                   Blood Pressure (mmHg) <span className="text-red-500">*</span>
@@ -257,7 +249,6 @@ function VitalsEntry() {
                 <p className="text-xs text-gray-400 mt-1">Normal: 90–120 / 60–80</p>
               </div>
 
-              {/* Temperature */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                   Temperature (°F) <span className="text-red-500">*</span>
@@ -272,7 +263,6 @@ function VitalsEntry() {
                 <p className="text-xs text-gray-400 mt-1">97–99°F</p>
               </div>
 
-              {/* Pulse */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                   Pulse Rate (BPM) <span className="text-red-500">*</span>
@@ -419,15 +409,28 @@ function VitalsEntry() {
               />
             </div>
 
+            {saved && (
+              <p className="text-sm text-green-600 mb-3">✓ Vitals saved for {patient?.name}.</p>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-1.5 border border-red-300 text-red-600 text-sm px-4 py-2 rounded-lg hover:bg-red-50 transition">
+              <button
+                onClick={() => handleSave(true)}
+                className="flex items-center gap-1.5 border border-red-300 text-red-600 text-sm px-4 py-2 rounded-lg hover:bg-red-50 transition"
+              >
                 ⚠️ Flag as Critical
               </button>
-              <button className="flex items-center gap-1.5 border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition ml-auto">
+              <button
+                onClick={() => handleSave(false)}
+                className="flex items-center gap-1.5 border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition ml-auto"
+              >
                 💾 Save Vitals
               </button>
-              <button className="flex items-center gap-1.5 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-700 transition">
+              <button
+                onClick={() => navigate('/nurse/patient-queue')}
+                className="flex items-center gap-1.5 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-700 transition"
+              >
                 🔔 Notify Doctor
               </button>
             </div>

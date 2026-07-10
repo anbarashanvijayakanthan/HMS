@@ -2,24 +2,14 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
+import { useVisit, useDiagnoses } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard", "Patient Consultation", "Diagnosis",
   "Prescription", "Lab Order", "Radiology Order", "Follow-up Manager",
 ]
 
-const MOCK_PATIENTS = {
-  "T-009": {
-    name: "Sneha Patel", ageSex: "31 yrs / F", id: "P-1004",
-    dept: "Cardiology", bp: "128/84", pulse: "92 bpm", allergies: "Aspirin",
-  },
-  "T-010": {
-    name: "Rajesh Verma", ageSex: "56 yrs / M", id: "P-1045",
-    dept: "Cardiology", bp: "150/95", pulse: "88 bpm", allergies: "None",
-  },
-}
-
-// Mock ICD-10 suggestions
+// Mock ICD-10 suggestions — search index, not patient data, stays local
 const ICD10_LIST = [
   { code: "I10",   name: "Essential Hypertension" },
   { code: "I49.9", name: "Cardiac Arrhythmia, unspecified" },
@@ -37,10 +27,9 @@ function Diagnosis() {
   const { user } = useAuth()
   const [activeLink, setActiveLink] = useState("Diagnosis")
 
-  const patient = MOCK_PATIENTS[token] || {
-    name: "Unknown", ageSex: "--", id: "--",
-    dept: "--", bp: "--", pulse: "--", allergies: "--",
-  }
+  // ── Shared store ──
+  const { visit, patient } = useVisit(token)
+  const { diagnoses, addDiagnosis } = useDiagnoses(patient?.id)
 
   // Search state
   const [search, setSearch]       = useState('')
@@ -50,12 +39,6 @@ function Diagnosis() {
   // Form state
   const [nature, setNature]   = useState('PROVISIONAL')
   const [notes, setNotes]     = useState('')
-
-  // Saved diagnoses list
-  const [diagnosisList, setDiagnosisList] = useState([
-    { code: "I10",   name: "Essential Hypertension",        nature: "Confirmed"   },
-    { code: "I49.9", name: "Cardiac Arrhythmia, unspecified", nature: "Provisional" },
-  ])
 
   const handleSearch = (val) => {
     setSearch(val)
@@ -76,12 +59,12 @@ function Diagnosis() {
   }
 
   const handleSave = () => {
-    if (!selected) return
-    setDiagnosisList(prev => [...prev, {
+    if (!selected || !patient) return
+    addDiagnosis({
       code: selected.code,
       name: selected.name,
       nature: nature === 'CONFIRM' ? 'Confirmed' : 'Provisional',
-    }])
+    })
     setSelected(null)
     setSearch('')
     setNotes('')
@@ -94,6 +77,19 @@ function Diagnosis() {
     if (link === "Patient Consultation") navigate(`/doctor/consultation/${token}`)
     if (link === "Prescription")         navigate(`/doctor/prescription/${token}`)
     if (link === "Lab Order")            navigate(`/doctor/lab-order/${token}`)
+    if (link === "Radiology Order")      navigate(`/doctor/radiology-order/${token}`)
+    if (link === "Follow-up Manager")    navigate(`/doctor/followup/${token}`)
+  }
+
+  if (!patient || !visit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <p className="text-gray-500">No patient found for token "{token}".</p>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -110,7 +106,7 @@ function Diagnosis() {
           </p>
           <h2 className="text-2xl font-bold text-gray-800">Diagnosis</h2>
           <p className="text-sm text-gray-400">
-            {patient.name} · {patient.id} · {patient.dept}
+            {patient.name} · {patient.id} · {visit.department}
           </p>
         </div>
 
@@ -134,7 +130,6 @@ function Diagnosis() {
                   placeholder="e.g. Hypertension or I10..."
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {/* Dropdown */}
                 {suggestions.length > 0 && (
                   <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                     {suggestions.map(item => (
@@ -201,10 +196,10 @@ function Diagnosis() {
               </div>
             </div>
 
-            {/* Diagnosis List */}
+            {/* Diagnosis List — now persisted per-patient in the store */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-semibold text-gray-700 mb-4">
-                Diagnosis List — This Visit
+                Diagnosis List — This Patient
               </h3>
               <table className="w-full text-sm">
                 <thead>
@@ -212,11 +207,10 @@ function Diagnosis() {
                     <th className="pb-3 font-medium">ICD-10</th>
                     <th className="pb-3 font-medium">Diagnosis</th>
                     <th className="pb-3 font-medium">Diagnosis Nature</th>
-                    <th className="pb-3 font-medium">Edit</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnosisList.map((d, i) => (
+                  {diagnoses.map((d, i) => (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-3">
                         <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
@@ -233,16 +227,11 @@ function Diagnosis() {
                           {d.nature}
                         </span>
                       </td>
-                      <td className="py-3">
-                        <button className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-                          ✏️ EDIT
-                        </button>
-                      </td>
                     </tr>
                   ))}
-                  {diagnosisList.length === 0 && (
+                  {diagnoses.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-gray-400">
+                      <td colSpan={3} className="py-8 text-center text-gray-400">
                         No diagnoses added yet
                       </td>
                     </tr>
@@ -258,11 +247,10 @@ function Diagnosis() {
               <h3 className="font-semibold text-gray-700 mb-4">Patient Summary</h3>
               <div className="flex flex-col gap-3">
                 {[
-                  { label: "Name",     value: patient.name },
-                  { label: "Age/Sex",  value: patient.ageSex },
-                  { label: "BP Today", value: patient.bp },
-                  { label: "Pulse",    value: patient.pulse },
-                  { label: "Allergies", value: patient.allergies },
+                  { label: "Name",      value: patient.name },
+                  { label: "Age/Sex",   value: `${patient.age}${patient.gender?.charAt(0)}` },
+                  { label: "Department",value: visit.department },
+                  { label: "Allergies", value: patient.allergies.length > 0 ? patient.allergies.join(', ') : "None" },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between text-sm border-b border-gray-50 pb-2 last:border-0">
                     <span className="text-gray-400">{row.label}</span>
@@ -273,7 +261,6 @@ function Diagnosis() {
                 ))}
               </div>
 
-              {/* Quick nav to next step */}
               <button
                 onClick={() => navigate(`/doctor/prescription/${token}`)}
                 className="w-full mt-5 bg-blue-600 text-white text-sm py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"

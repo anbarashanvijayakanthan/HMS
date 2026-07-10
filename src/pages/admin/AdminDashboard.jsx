@@ -4,70 +4,62 @@ import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
 import StatsCard from '../../components/common/StatsCard'
 import StatusBadge from '../../components/common/StatusBadge'
+import { usePatients, useQueue, useAppointments, useDoctors, useBills } from '../../store/hospitalStore'
+
+// Initials from name
+
 
 // ─── Nav ────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
-  'Dashboard',
-  'Patients',
-  'Appointments',
-  'Doctors',
-  'Staff',
-  'OP',
-  'IP',
-  'Prescriptions',
-  'Pharmacy',
-  'Laboratory',
-  'Vehicles',
-  'Finance',
-  'Follow-ups',
-  'Reports',
-  'Settings',
+  'Dashboard', 'Doctors', 'Staff', 'IP',
+  'Vehicles', 'Finance', 'Follow-ups', 'Reports',
 ]
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
 const RECENT_PATIENTS = [
-  { avatar: 'JB', name: 'Jerome Bell',       dept: 'Cardiology · 34y',    status: 'Checked In'      },
-  { avatar: 'BS', name: 'Brooklyn Simmons',  dept: 'Orthopedics · 58y',   status: 'Waiting'         },
-  { avatar: 'SN', name: 'Savannah Nguyen',   dept: 'Gynecology · 27y',    status: 'In Consultation' },
-  { avatar: 'EH', name: 'Esther Howard',     dept: 'Neurology · 45y',     status: 'Completed'       },
-  { avatar: 'JJ', name: 'Jacob Jones',       dept: 'Internal Medicine · 62y', status: 'Waiting'     },
+  { avatar: 'JB', name: 'Jerome Bell', dept: 'Cardiology · 34y', status: 'Checked In' },
+  { avatar: 'BS', name: 'Brooklyn Simmons', dept: 'Orthopedics · 58y', status: 'Waiting' },
+  { avatar: 'SN', name: 'Savannah Nguyen', dept: 'Gynecology · 27y', status: 'In Consultation' },
+  { avatar: 'EH', name: 'Esther Howard', dept: 'Neurology · 45y', status: 'Completed' },
+  { avatar: 'JJ', name: 'Jacob Jones', dept: 'Internal Medicine · 62y', status: 'Waiting' },
 ]
 
 const DOCTOR_AVAILABILITY = [
-  { avatar: 'RF', name: 'Dr. Robert Fox',   dept: 'Cardiology',   status: 'Available',       count: '8 today'  },
-  { avatar: 'BC', name: 'Dr. Bessie Cooper',dept: 'Gynecology',   status: 'In Consultation', count: '12 today' },
-  { avatar: 'JB', name: 'Dr. Jerome Bell',  dept: 'Orthopedics',  status: 'On Leave',        count: ''         },
-  { avatar: 'RE', name: 'Dr. Ralph Edwards',dept: 'Neurology',    status: 'Available',       count: '6 today'  },
+  { avatar: 'RF', name: 'Dr. Robert Fox', dept: 'Cardiology', status: 'Available', count: '8 today' },
+  { avatar: 'BC', name: 'Dr. Bessie Cooper', dept: 'Gynecology', status: 'In Consultation', count: '12 today' },
+  { avatar: 'JB', name: 'Dr. Jerome Bell', dept: 'Orthopedics', status: 'On Leave', count: '' },
+  { avatar: 'RE', name: 'Dr. Ralph Edwards', dept: 'Neurology', status: 'Available', count: '6 today' },
 ]
 
 const ALERTS = [
-  { color: 'orange', icon: '⚠️', text: '3 prescriptions pending pharmacy fulfilment'   },
-  { color: 'green',  icon: '✅', text: 'Lab report uploaded for patient P-10419'        },
-  { color: 'blue',   icon: 'ℹ️', text: '2 follow-ups due today — Call Pending'          },
+  { color: 'orange', icon: '⚠️', text: '3 prescriptions pending pharmacy fulfilment' },
+  { color: 'green', icon: '✅', text: 'Lab report uploaded for patient P-10419' },
+  { color: 'blue', icon: 'ℹ️', text: '2 follow-ups due today — Call Pending' },
 ]
 
 // ─── Tiny chart data (SVG sparkline-style, rendered inline) ─────────────────
 // Multi-line trend chart data points (normalised 0–100)
 const LINE_CHART_SERIES = [
-  { color: '#6366f1', points: [60,55,70,65,80,60,75,65,70,55,65,75,60] },
-  { color: '#f97316', points: [80,70,60,75,55,80,65,80,60,70,80,65,75] },
-  { color: '#06b6d4', points: [40,55,45,55,40,55,50,45,55,40,50,45,55] },
+  { color: '#6366f1', points: [60, 55, 70, 65, 80, 60, 75, 65, 70, 55, 65, 75, 60] },
+  { color: '#f97316', points: [80, 70, 60, 75, 55, 80, 65, 80, 60, 70, 80, 65, 75] },
+  { color: '#06b6d4', points: [40, 55, 45, 55, 40, 55, 50, 45, 55, 40, 50, 45, 55] },
 ]
-const LINE_LABELS = ['Figma','Sketch','XD','PS','AI','CoreD RAW','InDesign','Canva','Webflow','Affinity','Marker','Figma']
+const LINE_LABELS = ['Figma', 'Sketch', 'XD', 'PS', 'AI', 'CoreD RAW', 'InDesign', 'Canva', 'Webflow', 'Affinity', 'Marker']
 
 const BAR_CHART_SERIES = [
-  { color: '#6366f1', values: [65,75,55,80,60,70,55,65,70,75] },
-  { color: '#f97316', values: [80,60,70,55,75,60,80,70,60,65] },
-  { color: '#06b6d4', values: [45,55,65,40,55,50,45,60,50,55] },
+  { color: '#6366f1', values: [65, 75, 55, 80, 60, 70, 55, 65, 70, 75] },
+  { color: '#f97316', values: [80, 60, 70, 55, 75, 60, 80, 70, 60, 65] },
+  { color: '#06b6d4', values: [45, 55, 65, 40, 55, 50, 45, 60, 50, 55] },
 ]
+
+// ─── Helper: avatar bubble ───────────────────────────────────────────────────
 
 // ─── Helper: avatar bubble ───────────────────────────────────────────────────
 const AVATAR_COLORS = [
   'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-pink-500',  'bg-yellow-500','bg-teal-500',
+  'bg-pink-500', 'bg-yellow-500', 'bg-teal-500',
 ]
-function Avatar({ initials, idx = 0, size = 'w-9 h-9' }) {
-  const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]
+function Avatar({ initials, idx = 0, size = 'w-9 h-9' }) {  const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]
   return (
     <div className={`${size} ${color} rounded-full flex items-center justify-center
                      text-white text-xs font-bold shrink-0`}>
@@ -79,9 +71,9 @@ function Avatar({ initials, idx = 0, size = 'w-9 h-9' }) {
 // ─── Helper: doctor / patient status badge (local, not StatusBadge) ──────────
 function DoctorBadge({ status }) {
   const map = {
-    'Available':        'bg-green-100 text-green-700',
-    'In Consultation':  'bg-blue-100  text-blue-700',
-    'On Leave':         'bg-gray-100  text-gray-500',
+    'Available': 'bg-green-100 text-green-700',
+    'In Consultation': 'bg-blue-100  text-blue-700',
+    'On Leave': 'bg-gray-100  text-gray-500',
   }
   return (
     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${map[status] || 'bg-gray-100 text-gray-500'}`}>
@@ -106,7 +98,7 @@ function LineChart() {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32">
       {/* Y grid lines */}
-      {[0,25,50,75,100].map(v => {
+      {[0, 25, 50, 75, 100].map(v => {
         const y = PAD + ((100 - v) / 100) * (H - PAD * 2)
         return (
           <line key={v} x1={PAD} x2={W - PAD} y1={y} y2={y}
@@ -114,7 +106,7 @@ function LineChart() {
         )
       })}
       {/* Y axis labels */}
-      {[0,25,50,75,100].map(v => {
+      {[0, 25, 50, 75, 100].map(v => {
         const y = PAD + ((100 - v) / 100) * (H - PAD * 2)
         return (
           <text key={v} x={PAD - 4} y={y + 3.5}
@@ -143,19 +135,19 @@ function BarChart() {
   const W = 190, H = 130, PAD = 10
   const cols = BAR_CHART_SERIES[0].values.length
   const groupW = (W - PAD * 2) / cols
-  const barW   = groupW / BAR_CHART_SERIES.length - 1.5
+  const barW = groupW / BAR_CHART_SERIES.length - 1.5
   const chartH = H - PAD * 2 - 10
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32">
       {/* Y grid */}
-      {[0,25,50,75,100].map(v => {
+      {[0, 25, 50, 75, 100].map(v => {
         const y = PAD + ((100 - v) / 100) * chartH
         return <line key={v} x1={PAD} x2={W - PAD} y1={y} y2={y}
           stroke="#f0f0f0" strokeWidth="0.8" />
       })}
       {/* Y labels */}
-      {[0,25,50,75,100].map(v => {
+      {[0, 25, 50, 75, 100].map(v => {
         const y = PAD + ((100 - v) / 100) * chartH
         return <text key={v} x={PAD - 2} y={y + 3}
           textAnchor="end" fontSize="6" fill="#aaa">{v}</text>
@@ -164,8 +156,8 @@ function BarChart() {
       {BAR_CHART_SERIES.map((s, si) =>
         s.values.map((v, ci) => {
           const bH = (v / 100) * chartH
-          const x  = PAD + ci * groupW + si * (barW + 1.5)
-          const y  = PAD + chartH - bH
+          const x = PAD + ci * groupW + si * (barW + 1.5)
+          const y = PAD + chartH - bH
           return (
             <rect key={`${si}-${ci}`}
               x={x} y={y} width={barW} height={bH}
@@ -192,9 +184,21 @@ function AlertBanner({ color, icon, text }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 function AdminDashboard() {
   const { user } = useAuth()
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState('Dashboard')
   const [search, setSearch] = useState('')
+
+  // ── Shared store ──
+  const patients = usePatients()
+  const { queue } = useQueue()
+  const { appointments } = useAppointments()
+  const { doctors } = useDoctors()
+  const { bills } = useBills()
+
+  const opCount = queue.filter(v => v.department !== "Emergency").length
+  const ipCount = queue.filter(v => v.department === "Emergency").length
+  const todaysRevenue = bills.reduce((sum, b) => sum + (b.net || 0), 0)
+  const doctorsOnDuty = doctors.filter(d => d.status === "Active").length
 
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -207,17 +211,17 @@ function AdminDashboard() {
       <Sidebar
         links={NAV_LINKS}
         activeLink={activeLink}
-onLinkClick={(link) => {
-  setActiveLink(link)
-  if (link === 'Dashboard') navigate('/admin')
-  if (link === 'IP') navigate('/admin/ip')
-    if (link === 'Doctors') navigate('/admin/doctors')
-    if (link === 'Staff') navigate('/admin/staff')
-      if (link === 'Vehicles') navigate('/admin/vehicles')
-        if (link === 'Finance') navigate('/admin/finance')
+        onLinkClick={(link) => {
+          setActiveLink(link)
+          if (link === 'Dashboard') navigate('/admin')
+          if (link === 'IP') navigate('/admin/ip')
+          if (link === 'Doctors') navigate('/admin/doctors')
+          if (link === 'Staff') navigate('/admin/staff')
+          if (link === 'Vehicles') navigate('/admin/vehicles')
+          if (link === 'Finance') navigate('/admin/finance')
           if (link === 'Follow-ups') navigate('/admin/followups')
-            if (link === 'Reports') navigate('/admin/reports')
-}}      />
+          if (link === 'Reports') navigate('/admin/reports')
+        }} />
 
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-h-screen overflow-auto">
@@ -287,34 +291,26 @@ onLinkClick={(link) => {
             <StatsCard
               icon="♿"
               label="Patients Today"
-              value={200}
-              sub="+12% vs yesterday"
+              value={queue.length}
+              sub={`${patients.length} total registered`}
               subColor="text-green-500"
-              trend="up"
             />
             <StatsCard
               icon="📅"
               label="Appointments"
-              value={100}
-              sub="+5% vs yesterday"
-              subColor="text-green-500"
-              trend="up"
+              value={appointments.length}
+              sub={`${appointments.filter(a => a.status === "Scheduled").length} pending`}
+              subColor="text-orange-400"
             />
             <StatsCard
               icon="🗂️"
               label="OP Count"
-              value={40}
-              sub="-3% vs yesterday"
-              subColor="text-red-400"
-              trend="down"
+              value={opCount}
             />
             <StatsCard
               icon="🛏️"
-              label="IP Count"
-              value={30}
-              sub="+2 new admissions"
-              subColor="text-green-500"
-              trend="up"
+              label="Emergency Cases"
+              value={ipCount}
             />
           </div>
 
@@ -326,7 +322,7 @@ onLinkClick={(link) => {
                 <span className="text-xl">💰</span>
                 <span className="text-xs font-semibold text-green-500">+18%</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800">₹ 70,000</p>
+              <p className="text-2xl font-bold text-gray-800">₹ {todaysRevenue.toLocaleString('en-IN')}</p>
               <p className="text-xs text-gray-400 mt-1 uppercase tracking-wide font-medium">
                 Revenue Today
               </p>
@@ -361,9 +357,9 @@ onLinkClick={(link) => {
               <div className="flex items-start justify-between mb-2">
                 <span className="text-xl">👨‍⚕️</span>
                 <span className="text-xs font-medium text-orange-500 bg-orange-50
-                                 px-2 py-0.5 rounded-full">3 on leave</span>
+                                 px-2 py-0.5 rounded-full">{doctors.length - doctorsOnDuty} on leave</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800">15/20</p>
+              <p className="text-2xl font-bold text-gray-800">{doctorsOnDuty}/{doctors.length}</p>
               <p className="text-xs text-gray-400 mt-1 uppercase tracking-wide font-medium">
                 Doctors On Duty
               </p>
@@ -378,16 +374,16 @@ onLinkClick={(link) => {
               <LineChart />
               {/* X labels */}
               <div className="flex justify-between mt-1 px-5">
-                {LINE_LABELS.map(l => (
-                  <span key={l} className="text-[9px] text-gray-400 text-center leading-tight"
-                        style={{ width: `${100 / LINE_LABELS.length}%` }}>
+                {LINE_LABELS.map((l, i) => (
+                  <span key={i} className="text-[9px] text-gray-400 text-center leading-tight"
+                    style={{ width: `${100 / LINE_LABELS.length}%` }}>
                     {l}
                   </span>
                 ))}
               </div>
               {/* Legend */}
               <div className="flex items-center gap-5 mt-3 justify-center">
-                {[['#6366f1','2020'],['#f97316','2021'],['#06b6d4','2022']].map(([c,l]) => (
+                {[['#6366f1', '2020'], ['#f97316', '2021'], ['#06b6d4', '2022']].map(([c, l]) => (
                   <span key={l} className="flex items-center gap-1.5 text-xs text-gray-500">
                     <span className="w-6 h-0.5 rounded-full inline-block" style={{ backgroundColor: c }} />
                     {l}
@@ -401,7 +397,7 @@ onLinkClick={(link) => {
               <BarChart />
               {/* Legend */}
               <div className="flex items-center gap-3 mt-3 justify-center flex-wrap">
-                {[['#6366f1','2020'],['#f97316','2021'],['#06b6d4','2022']].map(([c,l]) => (
+                {[['#6366f1', '2020'], ['#f97316', '2021'], ['#06b6d4', '2022']].map(([c, l]) => (
                   <span key={l} className="flex items-center gap-1.5 text-xs text-gray-500">
                     <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: c }} />
                     {l}
@@ -429,9 +425,9 @@ onLinkClick={(link) => {
                       <p className="text-xs text-gray-400 truncate">{p.dept}</p>
                     </div>
                     <StatusBadge status={
-                      p.status === 'Checked In'      ? 'Done'
-                      : p.status === 'In Consultation' ? 'In Progress'
-                      : p.status
+                      p.status === 'Checked In' ? 'Done'
+                        : p.status === 'In Consultation' ? 'In Progress'
+                          : p.status
                     } />
                   </div>
                 ))}

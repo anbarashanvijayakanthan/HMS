@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
 import { useNavigate } from 'react-router-dom'
+import { usePatients, useQueue, useAllVitals } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -10,55 +11,19 @@ const NAV_LINKS = [
   "Vitals History",
 ]
 
-const MOCK_HISTORY = {
-  "P-1003": {
-    name: "Mohammed Farhan",
-    id: "P-1003",
-    age: "45 yrs",
-    gender: "Male",
-    blood: "O+",
-    lastBP: "138/88",
-    lastSpO2: "97%",
-    lastTemp: "98.4°F",
-    lastWeight: "74 kg",
-    records: [
-      { date: "19 Jun · 09:15", bp: "138/88", bpAlert: false, temp: "98.4", pulse: 78,  spo2: "97%", spo2Alert: false, weight: "74 kg", glucose: "108 mg/dL", recordedBy: "Sr. Meena", notes: "Mild headache"    },
-      { date: "15 Jun · 10:30", bp: "142/90", bpAlert: true,  temp: "99.1", pulse: 82,  spo2: "96%", spo2Alert: false, weight: "74 kg", glucose: "112 mg/dL", recordedBy: "Sr. Meena", notes: "—"                },
-      { date: "08 Jun · 09:00", bp: "136/85", bpAlert: false, temp: "98.6", pulse: 75,  spo2: "98%", spo2Alert: false, weight: "75 kg", glucose: "105 mg/dL", recordedBy: "Sr. Rani",  notes: "Post medication"  },
-      { date: "01 Jun · 11:15", bp: "145/92", bpAlert: true,  temp: "98.2", pulse: 85,  spo2: "95%", spo2Alert: true,  weight: "76 kg", glucose: "118 mg/dL", recordedBy: "Sr. Rani",  notes: "Stressed"         },
-    ]
-  },
-  "T-009": {
-    name: "Sneha Patel",
-    id: "P-1045",
-    age: "31 yrs",
-    gender: "Female",
-    blood: "B+",
-    lastBP: "120/80",
-    lastSpO2: "99%",
-    lastTemp: "98.2°F",
-    lastWeight: "58 kg",
-    records: [
-      { date: "19 Jun · 09:45", bp: "120/80", bpAlert: false, temp: "98.2", pulse: 72,  spo2: "99%", spo2Alert: false, weight: "58 kg", glucose: "90 mg/dL",  recordedBy: "Sr. Meena", notes: "Chest pain follow-up" },
-      { date: "10 Jun · 11:00", bp: "118/76", bpAlert: false, temp: "98.0", pulse: 70,  spo2: "99%", spo2Alert: false, weight: "58 kg", glucose: "88 mg/dL",  recordedBy: "Sr. Rani",  notes: "Routine"            },
-    ]
-  },
-}
-
-// Flatten all patients for search by name
-const ALL_PATIENTS = Object.values(MOCK_HISTORY)
-
-const VITAL_TYPES = ["All", "Blood Pressure", "Temperature", "SpO2", "Pulse", "Glucose", "Weight"]
-
 function VitalsHistory() {
   const { user }   = useAuth()
   const navigate   = useNavigate()
   const [activeLink, setActiveLink] = useState("Vitals History")
 
+  // ── Shared store ──
+  const patients = usePatients()
+  const { queue } = useQueue()
+  const vitalsMap = useAllVitals()
+
   const [searchInput, setSearchInput]   = useState('')
-  const [dateRange, setDateRange]       = useState('')
-  const [vitalType, setVitalType]       = useState('All')
   const [patient, setPatient]           = useState(null)
+  const [visit, setVisit]               = useState(null)
   const [searchError, setSearchError]   = useState('')
 
   const handleNavClick = (link) => {
@@ -70,26 +35,32 @@ function VitalsHistory() {
 
   const handleSearch = () => {
     const key = searchInput.trim().toUpperCase()
-    // Try token match first
-    let found = MOCK_HISTORY[key]
-    // Try name match
-    if (!found) {
-      found = ALL_PATIENTS.find(p =>
-        p.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        p.id.toLowerCase().includes(searchInput.toLowerCase())
-      )
+
+    // Try matching a today's-visit token directly
+    let foundVisit = queue.find(v => v.token === key)
+
+    // Otherwise match by patient name or ID, then find their visit today
+    if (!foundVisit) {
+      const byId = patients.find(p => p.id.toUpperCase() === key)
+      const byName = patients.find(p => p.name.toLowerCase().includes(searchInput.toLowerCase()))
+      const matchedPatient = byId || byName
+      if (matchedPatient) {
+        foundVisit = queue.find(v => v.patientId === matchedPatient.id)
+      }
     }
-    if (found) {
-      setPatient(found)
+
+    if (foundVisit) {
+      setVisit(foundVisit)
+      setPatient(foundVisit.patient)
       setSearchError('')
     } else {
       setPatient(null)
-      setSearchError('No patient found. Try a different name, ID or token.')
+      setVisit(null)
+      setSearchError('No patient found with a visit today. Try a different name, ID or token.')
     }
   }
 
-  // Filter records by vital type (date range filter UI-only for now)
-  const filteredRecords = patient?.records || []
+  const vitals = visit ? vitalsMap[visit.token] : null
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -106,20 +77,16 @@ function VitalsHistory() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Vitals History</h2>
-            <p className="text-sm text-gray-400">View historical vital signs for a patient</p>
+            <p className="text-sm text-gray-400">View today's recorded vital signs for a patient</p>
           </div>
-          <button className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-            ↑ Export
-          </button>
         </div>
 
         {/* Search Bar */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-5">
           <div className="flex gap-4 items-end">
-
             <div className="flex-1">
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                Patient ID or Name
+                Patient ID, Name, or Token
               </label>
               <input
                 type="text"
@@ -129,34 +96,6 @@ function VitalsHistory() {
                 placeholder="Search patient..."
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                Date Range
-              </label>
-              <input
-                type="text"
-                value={dateRange}
-                onChange={e => setDateRange(e.target.value)}
-                placeholder="e.g. 01 Jun – 19 Jun"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                Vital Type
-              </label>
-              <select
-                value={vitalType}
-                onChange={e => setVitalType(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600"
-              >
-                {VITAL_TYPES.map(v => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
             </div>
 
             <button
@@ -183,44 +122,47 @@ function VitalsHistory() {
                 <div>
                   <p className="font-semibold text-gray-800">{patient.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {patient.id} · {patient.age} · {patient.gender} · Blood: {patient.blood}
+                    {patient.id} · {patient.age} yrs · {patient.gender} · Blood: {patient.blood} · Token: {visit.token}
                   </p>
                 </div>
               </div>
 
-              {/* Last vitals summary */}
-              <div className="flex items-center gap-8">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Last BP</p>
-                  <p className="text-sm font-bold text-orange-500">{patient.lastBP}</p>
+              {vitals ? (
+                <div className="flex items-center gap-8">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">BP</p>
+                    <p className="text-sm font-bold text-orange-500">{vitals.bpSys}/{vitals.bpDia}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">SpO2</p>
+                    <p className="text-sm font-bold text-green-500">{vitals.spo2}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Temp</p>
+                    <p className="text-sm font-bold text-blue-500">{vitals.temp}°F</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Weight</p>
+                    <p className="text-sm font-bold text-gray-800">{vitals.weight} kg</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Last SpO2</p>
-                  <p className="text-sm font-bold text-green-500">{patient.lastSpO2}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Last Temp</p>
-                  <p className="text-sm font-bold text-blue-500">{patient.lastTemp}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Last Weight</p>
-                  <p className="text-sm font-bold text-gray-800">{patient.lastWeight}</p>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-400">No vitals recorded yet today</p>
+              )}
             </div>
           </div>
         )}
 
-        {/* Vitals Record History Table */}
-        {patient && (
+        {/* Today's Vitals Record */}
+        {patient && vitals && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="font-semibold text-gray-700 mb-4">Vitals Record History</h3>
+            <h3 className="font-semibold text-gray-700 mb-4">Today's Vitals Record</h3>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-400 border-b border-gray-100">
-                    <th className="pb-3 font-medium">Date & Time</th>
+                    <th className="pb-3 font-medium">Recorded At</th>
                     <th className="pb-3 font-medium">BP</th>
                     <th className="pb-3 font-medium">Temp (°F)</th>
                     <th className="pb-3 font-medium">Pulse</th>
@@ -232,30 +174,36 @@ function VitalsHistory() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRecords.map((r, i) => (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                      <td className="py-3 text-xs text-gray-500 font-medium">{r.date}</td>
-                      <td className="py-3 font-semibold">
-                        <span className={r.bpAlert ? "text-orange-500" : "text-gray-800"}>
-                          {r.bp}
-                        </span>
-                      </td>
-                      <td className="py-3 text-gray-700">{r.temp}</td>
-                      <td className="py-3 text-gray-700">{r.pulse}</td>
-                      <td className="py-3 font-semibold">
-                        <span className={r.spo2Alert ? "text-red-500" : "text-green-500"}>
-                          {r.spo2}
-                        </span>
-                      </td>
-                      <td className="py-3 text-gray-700">{r.weight}</td>
-                      <td className="py-3 text-gray-700">{r.glucose}</td>
-                      <td className="py-3 text-gray-500 text-xs">{r.recordedBy}</td>
-                      <td className="py-3 text-gray-400 text-xs italic">{r.notes}</td>
-                    </tr>
-                  ))}
+                  <tr className="border-b border-gray-50 hover:bg-gray-50 transition">
+                    <td className="py-3 text-xs text-gray-500 font-medium">{vitals.timestamp}</td>
+                    <td className="py-3 font-semibold text-gray-800">{vitals.bpSys}/{vitals.bpDia}</td>
+                    <td className="py-3 text-gray-700">{vitals.temp}</td>
+                    <td className="py-3 text-gray-700">{vitals.pulse}</td>
+                    <td className="py-3 font-semibold">
+                      <span className={vitals.critical ? "text-red-500" : "text-green-500"}>
+                        {vitals.spo2}%
+                      </span>
+                    </td>
+                    <td className="py-3 text-gray-700">{vitals.weight} kg</td>
+                    <td className="py-3 text-gray-700">{vitals.glucose || '—'} mg/dL</td>
+                    <td className="py-3 text-gray-500 text-xs">{vitals.recordedBy}</td>
+                    <td className="py-3 text-gray-400 text-xs italic">{vitals.complaints || '—'}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
+
+            <p className="text-xs text-gray-400 mt-4">
+              Showing today's visit only. Historical vitals across past visits aren't tracked yet.
+            </p>
+          </div>
+        )}
+
+        {/* Patient found, but nothing recorded */}
+        {patient && !vitals && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
+            <p className="text-4xl mb-3">📋</p>
+            <p className="text-gray-500 font-medium">No vitals recorded yet for {patient.name} today</p>
           </div>
         )}
 
@@ -263,7 +211,7 @@ function VitalsHistory() {
         {!patient && !searchError && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
             <p className="text-4xl mb-3">📊</p>
-            <p className="text-gray-500 font-medium">Search for a patient to view their vitals history</p>
+            <p className="text-gray-500 font-medium">Search for a patient to view their vitals</p>
             <p className="text-gray-400 text-sm mt-1">Enter a patient name, ID or token above</p>
           </div>
         )}

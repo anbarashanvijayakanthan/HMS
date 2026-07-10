@@ -1,28 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/common/Sidebar'
+import { useVisit, useVitals, useQueue } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard", "Patient Consultation", "Diagnosis",
   "Prescription", "Lab Order", "Radiology Order", "Follow-up Manager",
 ]
-
-// Mock patient data — replace with API later
-const MOCK_PATIENTS = {
-  "T-009": {
-    name: "Sneha Patel", age: "31F", id: "P-1043",
-    complaint: "Chest pain, palpitations",
-    vitals: { bp: "120/80", pulse: "88 bpm", temp: "98.6°F", spo2: "98%", weight: "62 kg" },
-    history: "No known allergies. Hypertension (controlled).",
-  },
-  "T-010": {
-    name: "Rajesh Verma", age: "56M", id: "P-1044",
-    complaint: "Hypertension follow-up",
-    vitals: { bp: "150/95", pulse: "92 bpm", temp: "98.4°F", spo2: "96%", weight: "78 kg" },
-    history: "Hypertension 5 years. On Amlodipine 5mg.",
-  },
-}
 
 function PatientConsultation() {
   const { token } = useParams()
@@ -31,25 +16,62 @@ function PatientConsultation() {
   const [activeLink, setActiveLink] = useState("Patient Consultation")
   const [notes, setNotes] = useState('')
 
-  const patient = MOCK_PATIENTS[token] || {
-    name: "Unknown Patient", age: "--", id: "--",
-    complaint: "--",
-    vitals: { bp: "--", pulse: "--", temp: "--", spo2: "--", weight: "--" },
-    history: "--",
-  }
+  // ── Shared store ──
+  const { visit, patient } = useVisit(token)
+  const { vitals } = useVitals(token)
+  const { setStatus } = useQueue()
+
+  // When the doctor opens a case that's "Ready for Doctor", move it to
+  // "With Doctor" automatically — same status everyone else already sees.
+  useEffect(() => {
+    if (visit && visit.status === "Ready for Doctor") {
+      setStatus(token, "With Doctor")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   const handleNavClick = (link) => {
     setActiveLink(link)
-    if (link === "Dashboard") navigate('/doctor')
+    if (link === "Dashboard")            navigate('/doctor')
+    if (link === "Diagnosis")            navigate(`/doctor/diagnosis/${token}`)
+    if (link === "Prescription")         navigate(`/doctor/prescription/${token}`)
+    if (link === "Lab Order")            navigate(`/doctor/lab-order/${token}`)
+    if (link === "Radiology Order")      navigate(`/doctor/radiology-order/${token}`)
+    if (link === "Follow-up Manager")    navigate(`/doctor/followup/${token}`)
   }
+
+  if (!patient || !visit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
+        <main className="flex-1 p-6">
+          <button onClick={() => navigate('/doctor')} className="text-sm text-gray-400 hover:text-gray-600 mb-4">
+            ← Back to Dashboard
+          </button>
+          <p className="text-gray-500">No patient found for token "{token}".</p>
+        </main>
+      </div>
+    )
+  }
+
+  // Build the vitals display grid from whatever the nurse actually recorded
+  const vitalsDisplay = vitals ? {
+    BP:     `${vitals.bpSys || '—'}/${vitals.bpDia || '—'}`,
+    Pulse:  `${vitals.pulse || '—'} bpm`,
+    Temp:   `${vitals.temp || '—'}°F`,
+    SpO2:   `${vitals.spo2 || '—'}%`,
+    Weight: `${vitals.weight || '—'} kg`,
+    Glucose:`${vitals.glucose || '—'} mg/dL`,
+  } : null
+
+  const historyText = [
+    patient.chronic && patient.chronic !== "None" ? `Chronic: ${patient.chronic}.` : null,
+    patient.allergies.length > 0 ? `Allergies: ${patient.allergies.join(', ')}.` : "No known allergies.",
+  ].filter(Boolean).join(' ')
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar
-        links={NAV_LINKS}
-        activeLink={activeLink}
-        onLinkClick={handleNavClick}
-      />
+      <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
 
       <main className="flex-1 p-6 overflow-auto">
         {/* Header */}
@@ -85,7 +107,7 @@ function PatientConsultation() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Age / Sex</span>
-                  <span className="font-medium text-gray-800">{patient.age}</span>
+                  <span className="font-medium text-gray-800">{patient.age}{patient.gender?.charAt(0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Patient ID</span>
@@ -95,26 +117,37 @@ function PatientConsultation() {
                   <span className="text-gray-400">Token</span>
                   <span className="font-mono text-xs text-gray-500">{token}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Department</span>
+                  <span className="font-medium text-gray-800">{visit.department}</span>
+                </div>
               </div>
             </div>
 
-            {/* Vitals Card */}
+            {/* Vitals Card — real data from Nurse's Vitals Entry */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-700 mb-3">Vitals</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.entries(patient.vitals).map(([key, val]) => (
-                  <div key={key} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400 uppercase">{key}</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{val}</p>
-                  </div>
-                ))}
-              </div>
+              {vitalsDisplay ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(vitalsDisplay).map(([key, val]) => (
+                    <div key={key} className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-400 uppercase">{key}</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-0.5">{val}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No vitals recorded yet for this visit.</p>
+              )}
+              {vitals?.critical && (
+                <p className="text-xs text-red-500 font-medium mt-3">⚠ Flagged critical by nurse</p>
+              )}
             </div>
 
             {/* History */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-700 mb-2">Medical History</h3>
-              <p className="text-sm text-gray-600">{patient.history}</p>
+              <p className="text-sm text-gray-600">{historyText}</p>
             </div>
           </div>
 
@@ -125,11 +158,11 @@ function PatientConsultation() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-700 mb-2">Chief Complaint</h3>
               <p className="text-sm text-gray-700 bg-yellow-50 border border-yellow-100 rounded-lg p-3">
-                {patient.complaint}
+                {visit.complaint}
               </p>
             </div>
 
-            {/* Consultation Notes */}
+            {/* Consultation Notes — still local; no shared entity for free-text notes yet */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex-1">
               <h3 className="font-semibold text-gray-700 mb-3">Consultation Notes</h3>
               <textarea

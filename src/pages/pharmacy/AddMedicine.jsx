@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
+import { useMedicines } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Dashboard",
@@ -25,10 +26,20 @@ const INITIAL_FORM = {
   reorderLevel: "",
 }
 
+const REQUIRED_FIELDS = [
+  "brandName", "genericName", "category", "strength",
+  "batchNumber", "quantityInStock", "expiryDate",
+  "sellingPrice", "costPrice", "reorderLevel",
+]
+
 function AddMedicine() {
   const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Add Medicine")
   const [form, setForm] = useState(INITIAL_FORM)
+  const [error, setError] = useState('')
+
+  // ── Shared store ──
+  const { addMedicine } = useMedicines()
 
   const handleNavClick = (link) => {
     setActiveLink(link)
@@ -42,16 +53,51 @@ function AddMedicine() {
 
   const handleChange = (field) => (e) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }))
+    setError('')
   }
 
   const handleSaveDraft = () => {
     console.log("Saved as draft:", form)
-    // TODO: wire to API
+    // Drafts intentionally stay local-only — not a store concept yet.
+  }
+
+  // Format expiry date to match the store's "Mon YYYY" style (e.g. "Dec 2026")
+  const formatExpiry = (dateStr) => {
+    if (!dateStr) return "—"
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  }
+
+  const deriveStatus = (stock, reorderLevel) => {
+    if (stock === 0) return "Out of Stock"
+    if (stock < reorderLevel) return "Low Stock"
+    return "In Stock"
   }
 
   const handleAddToInventory = () => {
-    console.log("Add to inventory:", form)
-    // TODO: wire to API, then navigate
+    const missing = REQUIRED_FIELDS.filter(f => !form[f])
+    if (missing.length > 0) {
+      setError('Please fill in all required fields marked with **')
+      return
+    }
+
+    const stock = parseInt(form.quantityInStock, 10) || 0
+    const reorderLevel = parseInt(form.reorderLevel, 10) || 0
+
+    addMedicine({
+      name: `${form.brandName} ${form.strength}`.trim(),
+      generic: form.genericName,
+      category: form.category,
+      manufacturer: form.manufacturer || "—",
+      stock,
+      batch: form.batchNumber,
+      expiry: formatExpiry(form.expiryDate),
+      price: parseFloat(form.sellingPrice) || 0,
+      costPrice: parseFloat(form.costPrice) || 0,
+      reorderLevel,
+      status: deriveStatus(stock, reorderLevel),
+    })
+
     navigate('/pharmacy/inventory')
   }
 
@@ -75,17 +121,11 @@ function AddMedicine() {
           </button>
         </div>
 
-        {/* Search bar (visual parity with screenshot) */}
-        <div className="flex items-center gap-3 mb-6">
-          <input
-            type="text"
-            placeholder="Search medicine..."
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button className="border border-gray-200 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition whitespace-nowrap">
-            ▽ Filter
-          </button>
-        </div>
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2.5 mb-5">
+            {error}
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-6">
 

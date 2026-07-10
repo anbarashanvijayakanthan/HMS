@@ -1,6 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
+import { useStaff } from '../../store/hospitalStore'
+import StatusBadge from '../../components/common/StatusBadge'                                                                                                                                                                                                                                                                                                                                                                                              
+// Initials from name
+function initials(name) {
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
+// Avatar color palette
+const AVATAR_COLORS = [
+  'bg-pink-400', 'bg-blue-500', 'bg-green-500',
+  'bg-purple-500', 'bg-yellow-500', 'bg-teal-500',
+  'bg-rose-400', 'bg-indigo-500', 'bg-orange-400',
+]
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
@@ -11,22 +24,23 @@ const NAV_LINKS = [
 
 // ─── Mock inpatient data ──────────────────────────────────────────────────────
 const INPATIENTS = [
-  { id: 1, name: 'Sanjay Kumar',      age: '67y', admission: 'IP-3021', ward: 'Cardiac ICU',   room: 'C-04 · B-2', doctor: 'Dr. Suresh Kumar',  admittedOn: '10 Jun 2026', status: 'Admitted',          avatarColor: 'bg-blue-200',   avatarText: 'SK' },
-  { id: 2, name: 'Lakshmi Devi',      age: '54y', admission: 'IP-3022', ward: 'General Ward',   room: 'G-12 · B-1', doctor: 'Dr. Kavitha Rao',   admittedOn: '12 Jun 2026', status: 'Admitted',          avatarColor: 'bg-pink-200',   avatarText: 'LD' },
-  { id: 3, name: 'Mohan Das',         age: '41y', admission: 'IP-3023', ward: 'Surgical Ward',  room: 'S-06 · B-3', doctor: 'Dr. Arun Sharma',   admittedOn: '14 Jun 2026', status: 'Post-Op',           avatarColor: 'bg-orange-200', avatarText: 'MD' },
-  { id: 4, name: 'Rekha Nair',        age: '32y', admission: 'IP-3024', ward: 'Maternity',      room: 'M-03 · B-1', doctor: 'Dr. Preethi Nair',  admittedOn: '15 Jun 2026', status: 'Admitted',          avatarColor: 'bg-purple-200', avatarText: 'RN' },
-  { id: 5, name: 'Thomas Varghese',   age: '72y', admission: 'IP-3025', ward: 'General Ward',   room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao',   admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-teal-200',   avatarText: 'TV' },
-  { id: 6, name: 'Thomas Varghese',   age: '72y', admission: 'IP-3025', ward: 'General Ward',   room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao',   admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-teal-200',   avatarText: 'TV' },
-  { id: 7, name: 'Cameron Williamson',age: '72y', admission: 'IP-3025', ward: 'General Ward',   room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao',   admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-indigo-200', avatarText: 'CW' },
+  { id: 1, name: 'Sanjay Kumar', age: '67y', admission: 'IP-3021', ward: 'Cardiac ICU', room: 'C-04 · B-2', doctor: 'Dr. Suresh Kumar', admittedOn: '10 Jun 2026', status: 'Admitted', avatarColor: 'bg-blue-200', avatarText: 'SK' },
+  { id: 2, name: 'Lakshmi Devi', age: '54y', admission: 'IP-3022', ward: 'General Ward', room: 'G-12 · B-1', doctor: 'Dr. Kavitha Rao', admittedOn: '12 Jun 2026', status: 'Admitted', avatarColor: 'bg-pink-200', avatarText: 'LD' },
+  { id: 3, name: 'Mohan Das', age: '41y', admission: 'IP-3023', ward: 'Surgical Ward', room: 'S-06 · B-3', doctor: 'Dr. Arun Sharma', admittedOn: '14 Jun 2026', status: 'Post-Op', avatarColor: 'bg-orange-200', avatarText: 'MD' },
+  { id: 4, name: 'Rekha Nair', age: '32y', admission: 'IP-3024', ward: 'Maternity', room: 'M-03 · B-1', doctor: 'Dr. Preethi Nair', admittedOn: '15 Jun 2026', status: 'Admitted', avatarColor: 'bg-purple-200', avatarText: 'RN' },
+  { id: 5, name: 'Thomas Varghese', age: '72y', admission: 'IP-3025', ward: 'General Ward', room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao', admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-teal-200', avatarText: 'TV' },
+  { id: 6, name: 'Thomas Varghese', age: '72y', admission: 'IP-3025', ward: 'General Ward', room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao', admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-teal-200', avatarText: 'TV' },
+  { id: 7, name: 'Cameron Williamson', age: '72y', admission: 'IP-3025', ward: 'General Ward', room: 'G-08 · B-2', doctor: 'Dr. Kavitha Rao', admittedOn: '16 Jun 2026', status: 'Under Observation', avatarColor: 'bg-indigo-200', avatarText: 'CW' }
+
 ]
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function IPStatusBadge({ status }) {
   const styles = {
-    'Admitted':          'bg-blue-100 text-blue-700',
-    'Post-Op':           'bg-purple-100 text-purple-700',
+    'Admitted': 'bg-blue-100 text-blue-700',
+    'Post-Op': 'bg-purple-100 text-purple-700',
     'Under Observation': 'bg-yellow-100 text-yellow-700',
-    'Discharged':        'bg-green-100 text-green-700',
+    'Discharged': 'bg-green-100 text-green-700',
   }
   return (
     <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap
@@ -39,10 +53,10 @@ function IPStatusBadge({ status }) {
 // ─── Bed stat cards ───────────────────────────────────────────────────────────
 function BedStatCard({ value, label, variant = 'default' }) {
   const v = {
-    default: { card: 'bg-white border border-gray-100',     val: 'text-gray-800',  lbl: 'text-gray-400'  },
-    blue:    { card: 'bg-white border border-gray-100',     val: 'text-blue-500',  lbl: 'text-blue-400'  },
-    green:   { card: 'bg-green-50 border border-green-100', val: 'text-green-600', lbl: 'text-green-500' },
-    red:     { card: 'bg-red-50 border border-red-100',     val: 'text-red-500',   lbl: 'text-red-400'   },
+    default: { card: 'bg-white border border-gray-100', val: 'text-gray-800', lbl: 'text-gray-400' },
+    blue: { card: 'bg-white border border-gray-100', val: 'text-blue-500', lbl: 'text-blue-400' },
+    green: { card: 'bg-green-50 border border-green-100', val: 'text-green-600', lbl: 'text-green-500' },
+    red: { card: 'bg-red-50 border border-red-100', val: 'text-red-500', lbl: 'text-red-400' },
   }[variant]
   return (
     <div className={`rounded-xl px-6 py-5 shadow-sm ${v.card}`}>
@@ -89,19 +103,27 @@ function AdminTopBar({ breadcrumb, search, onSearch }) {
 }
 
 // ─── Register Employee Modal ──────────────────────────────────────────────────
-const DEPARTMENTS = ['ICU','General Ward','OPD','Laboratory','Pharmacy',
-                     'Radiology','Finance','Administration','Surgical Ward','Maternity']
-const GENDERS = ['Male','Female','Other']
-const EMPTY_EMP = { name:'', gender:'', department:'', category:'', dob:'', address:'', mobile:'', salary:'', joiningDate:'' }
+const DEPARTMENTS = ['ICU', 'General Ward', 'OPD', 'Laboratory', 'Pharmacy',
+  'Radiology', 'Finance', 'Administration', 'Surgical Ward', 'Maternity']
+const GENDERS = ['Male', 'Female', 'Other']
+const EMPTY_EMP = { name: '', gender: '', department: '', category: '', dob: '', address: '', mobile: '', salary: '', joiningDate: '' }
 let empCounter = 107
 
-function RegisterEmployeeModal({ onClose }) {
+function RegisterEmployeeModal({ onClose, onAdd }) {
   const [form, setForm] = useState(EMPTY_EMP)
   const set = (field, val) => setForm(p => ({ ...p, [field]: val }))
 
   const handleSave = () => {
-    if (!form.name.trim()) return
+    if (!form.name.trim() || !form.department) return
     empCounter++
+    onAdd({
+      id: `S-${empCounter}`,
+      name: form.name,
+      role: form.category || 'Staff',
+      dept: form.department,
+      phone: form.mobile || '—',
+      status: 'Active',
+    })
     onClose()
   }
 
@@ -210,37 +232,33 @@ function RegisterEmployeeModal({ onClose }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function Staff() {
-  const navigate            = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState('Staff')
-  const [search, setSearch]         = useState('')
-  const [patients, setPatients]     = useState(INPATIENTS)
-  const [showModal, setShowModal]   = useState(false)
+  const [search, setSearch] = useState('')
+  const [showModal, setShowModal] = useState(false)
 
-  const filtered = patients.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.admission.toLowerCase().includes(search.toLowerCase()) ||
-    p.ward.toLowerCase().includes(search.toLowerCase()) ||
-    p.doctor.toLowerCase().includes(search.toLowerCase())
+  // ── Shared store — real staff list ──
+  const { staff, addStaff, updateStatus } = useStaff()
+
+  const filtered = staff.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.role.toLowerCase().includes(search.toLowerCase()) ||
+    s.dept.toLowerCase().includes(search.toLowerCase())
   )
-
-  const handleDischarge = (id) =>
-    setPatients(prev => prev.map(p => p.id === id ? { ...p, status: 'Discharged' } : p))
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Modal */}
-      {showModal && <RegisterEmployeeModal onClose={() => setShowModal(false)} />}
-
+      {showModal && <RegisterEmployeeModal onClose={() => setShowModal(false)} onAdd={addStaff} />}
       <Sidebar
         links={NAV_LINKS}
         activeLink={activeLink}
         onLinkClick={(link) => {
           setActiveLink(link)
           if (link === 'Dashboard') navigate('/admin')
-          if (link === 'Doctors')   navigate('/admin/doctors')
-          if (link === 'Staff')     navigate('/admin/staff')
-          if (link === 'IP')        navigate('/admin/ip')
+          if (link === 'Doctors') navigate('/admin/doctors')
+          if (link === 'Staff') navigate('/admin/staff')
+          if (link === 'IP') navigate('/admin/ip')
         }}
       />
 
@@ -253,7 +271,7 @@ function Staff() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-800">Staff</h2>
-              <p className="text-sm text-gray-400 mt-0.5">{patients.length} staff members</p>
+              <p className="text-sm text-gray-400 mt-0.5">{staff.length} staff members</p>
             </div>
             <button onClick={() => setShowModal(true)}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700
@@ -263,12 +281,12 @@ function Staff() {
             </button>
           </div>
 
-          {/* Bed stats */}
+          {/* Staff stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <BedStatCard value={120}  label="Total Beds" variant="default" />
-            <BedStatCard value={87}   label="Occupied"   variant="blue"    />
-            <BedStatCard value={33}   label="Available"  variant="green"   />
-            <BedStatCard value="8/12" label="ICU Beds"   variant="red"     />
+            <BedStatCard value={staff.length} label="Total Staff" variant="default" />
+            <BedStatCard value={staff.filter(s => s.status === 'Active').length} label="Active" variant="green" />
+            <BedStatCard value={staff.filter(s => s.status === 'On Leave').length} label="On Leave" variant="red" />
+            <BedStatCard value={new Set(staff.map(s => s.dept)).size} label="Departments" variant="blue" />
           </div>
 
           {/* Table */}
@@ -276,7 +294,7 @@ function Staff() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Patient','Admission #','Ward / Room / Bed','Doctor','Admitted On','Status','Actions'].map(h => (
+                  {['Employee', 'Role', 'Department', 'Phone', 'Status', 'Actions'].map(h => (
                     <th key={h} className="px-5 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">
                       {h}
                     </th>
@@ -284,41 +302,28 @@ function Staff() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                {filtered.map((s, i) => (
+                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
 
-                    {/* Patient */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full ${p.avatarColor}
-                                         flex items-center justify-center text-gray-600 text-xs font-bold shrink-0`}>
-                          {p.avatarText}
+                        <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[i % AVATAR_COLORS.length]}
+                                         flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                          {initials(s.name)}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-700">{p.name}</p>
-                          <p className="text-xs text-gray-400">{p.age}</p>
+                          <p className="font-medium text-gray-700">{s.name}</p>
+                          <p className="text-xs text-gray-400">{s.id}</p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Admission # */}
-                    <td className="px-5 py-3.5">
-                      <span className="text-blue-500 font-mono text-xs font-medium">{p.admission}</span>
-                    </td>
+                    <td className="px-5 py-3.5 text-gray-600 text-sm">{s.role}</td>
+                    <td className="px-5 py-3.5 text-gray-600 text-sm">{s.dept}</td>
+                    <td className="px-5 py-3.5 text-gray-600 text-sm">{s.phone}</td>
 
-                    {/* Ward / Room */}
-                    <td className="px-5 py-3.5">
-                      <p className="text-gray-700 text-sm">{p.ward}</p>
-                      <p className="text-gray-400 text-xs">{p.room}</p>
-                    </td>
+                    <td className="px-5 py-3.5"><StatusBadge status={s.status} /></td>
 
-                    <td className="px-5 py-3.5 text-gray-600 text-sm">{p.doctor}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-sm">{p.admittedOn}</td>
-
-                    {/* Status */}
-                    <td className="px-5 py-3.5"><IPStatusBadge status={p.status} /></td>
-
-                    {/* Actions */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3 text-gray-400">
                         <button title="Edit" className="hover:text-blue-500 transition">
@@ -328,8 +333,8 @@ function Staff() {
                                  m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
-                        <button title="Discharge" onClick={() => handleDischarge(p.id)}
-                          className="hover:text-green-500 transition">
+                        <button title="Mark On Leave" onClick={() => updateStatus(s.id, s.status === 'Active' ? 'On Leave' : 'Active')}
+                          className="hover:text-orange-500 transition">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round"
                               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6
@@ -341,7 +346,7 @@ function Staff() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="py-12 text-center text-gray-400 text-sm">No records found</td></tr>
+                  <tr><td colSpan={6} className="py-12 text-center text-gray-400 text-sm">No staff found</td></tr>
                 )}
               </tbody>
             </table>

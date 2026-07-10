@@ -4,10 +4,14 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 
+import { HospitalProvider } from './store/hospitalStore.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <App />
+      <HospitalProvider>
+        <App />
+      </HospitalProvider>
     </AuthProvider>
   </StrictMode>
 )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/common/Sidebar'
-
+import { useBills, usePatients } from '../../store/hospitalStore'
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 const NAV_LINKS = [
   'Dashboard', 'Patients', 'Appointments', 'Doctors', 'Staff',
@@ -11,48 +11,48 @@ const NAV_LINKS = [
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
 const STAT_CARDS = [
-  { value: '₹3,11,000', label: 'Total Income (Jun)',  sub: '+8% vs last month',  variant: 'green' },
-  { value: '₹1,18,000', label: 'Total Expenses (Jun)', sub: '-3% vs last month', variant: 'red'   },
-  { value: '₹1,93,000', label: 'Net Profit (Jun)',     sub: '+14% vs last month', variant: 'blue'  },
-  { value: '₹62,400',   label: "Today's Revenue",      sub: '+18% vs last month', variant: 'green' },
+  { value: '₹3,11,000', label: 'Total Income (Jun)', sub: '+8% vs last month', variant: 'green' },
+  { value: '₹1,18,000', label: 'Total Expenses (Jun)', sub: '-3% vs last month', variant: 'red' },
+  { value: '₹1,93,000', label: 'Net Profit (Jun)', sub: '+14% vs last month', variant: 'blue' },
+  { value: '₹62,400', label: "Today's Revenue", sub: '+18% vs last month', variant: 'green' },
 ]
 
-const BAR_LABELS = ['Figma','Sketch','XD','PS','AI','CorelDRAW','InDesign','Canva','Webflow','Affinity','Marker','Figma']
+const BAR_LABELS = ['Figma', 'Sketch', 'XD', 'PS', 'AI', 'CorelDRAW', 'InDesign', 'Canva', 'Webflow', 'Affinity', 'Marker', 'Figma']
 const BAR_SERIES = [
-  { color: '#a78bfa', values: [85,75,90,30,40,85,50,65,55,45,65,40] },
-  { color: '#fb923c', values: [45,65,40,85,95,75,15,25,60,30,80,55] },
-  { color: '#22d3ee', values: [50,55,60,15,45,55,20,80,90,40,30,50] },
+  { color: '#a78bfa', values: [85, 75, 90, 30, 40, 85, 50, 65, 55, 45, 65, 40] },
+  { color: '#fb923c', values: [45, 65, 40, 85, 95, 75, 15, 25, 60, 30, 80, 55] },
+  { color: '#22d3ee', values: [50, 55, 60, 15, 45, 55, 20, 80, 90, 40, 30, 50] },
 ]
 
 const DONUT_DATA = [
-  { label: 'Figma',     color: '#a78bfa', value: 12 },
-  { label: 'Sketch',    color: '#fb7185', value: 10 },
-  { label: 'XD',        color: '#38bdf8', value: 8  },
-  { label: 'PS',        color: '#06b6d4', value: 9  },
-  { label: 'AI',        color: '#fb923c', value: 7  },
-  { label: 'CorelDRAW', color: '#34d399', value: 8  },
-  { label: 'InDesign',  color: '#818cf8', value: 9  },
-  { label: 'Canva',     color: '#fbbf24', value: 8  },
-  { label: 'Webflow',   color: '#3b82f6', value: 10 },
-  { label: 'Affinity',  color: '#facc15', value: 6  },
-  { label: 'Marker',    color: '#10b981', value: 7  },
-  { label: 'Figma',     color: '#6366f1', value: 6  },
+  { label: 'Figma', color: '#a78bfa', value: 12 },
+  { label: 'Sketch', color: '#fb7185', value: 10 },
+  { label: 'XD', color: '#38bdf8', value: 8 },
+  { label: 'PS', color: '#06b6d4', value: 9 },
+  { label: 'AI', color: '#fb923c', value: 7 },
+  { label: 'CorelDRAW', color: '#34d399', value: 8 },
+  { label: 'InDesign', color: '#818cf8', value: 9 },
+  { label: 'Canva', color: '#fbbf24', value: 8 },
+  { label: 'Webflow', color: '#3b82f6', value: 10 },
+  { label: 'Affinity', color: '#facc15', value: 6 },
+  { label: 'Marker', color: '#10b981', value: 7 },
+  { label: 'Figma', color: '#6366f1', value: 6 },
 ]
 
 const TRANSACTIONS = [
   { title: 'OP Consultation - 42 patients', type: 'Revenue', date: '16 Jun 2026', amount: '+₹21,000' },
-  { title: 'Pharmacy Sales',                type: 'Revenue', date: '16 Jun 2026', amount: '+₹18,400' },
-  { title: 'Lab Test Revenue',              type: 'Revenue', date: '15 Jun 2026', amount: '+₹14,200' },
-  { title: 'Staff Salaries',                type: 'Expense', date: '15 Jun 2026', amount: '-₹85,000' },
-  { title: 'Medical Equipment Purchase',    type: 'Expense', date: '14 Jun 2026', amount: '-₹32,500' },
+  { title: 'Pharmacy Sales', type: 'Revenue', date: '16 Jun 2026', amount: '+₹18,400' },
+  { title: 'Lab Test Revenue', type: 'Revenue', date: '15 Jun 2026', amount: '+₹14,200' },
+  { title: 'Staff Salaries', type: 'Expense', date: '15 Jun 2026', amount: '-₹85,000' },
+  { title: 'Medical Equipment Purchase', type: 'Expense', date: '14 Jun 2026', amount: '-₹32,500' },
 ]
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function FinanceStatCard({ value, label, sub, variant }) {
   const styles = {
     green: { bg: 'bg-green-50', val: 'text-green-700', sub: 'text-green-500' },
-    red:   { bg: 'bg-red-50',   val: 'text-red-600',   sub: 'text-red-400'   },
-    blue:  { bg: 'bg-blue-50',  val: 'text-blue-600',  sub: 'text-blue-400'  },
+    red: { bg: 'bg-red-50', val: 'text-red-600', sub: 'text-red-400' },
+    blue: { bg: 'bg-blue-50', val: 'text-blue-600', sub: 'text-blue-400' },
   }[variant]
   return (
     <div className={`rounded-xl p-5 ${styles.bg}`}>
@@ -112,7 +112,7 @@ function FinanceBarChart() {
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 220 }}>
         {/* Grid lines + Y labels */}
-        {[0,20,40,60,80,100].map(v => {
+        {[0, 20, 40, 60, 80, 100].map(v => {
           const y = PAD_T + (1 - v / 100) * chartH
           return (
             <g key={v}>
@@ -144,7 +144,7 @@ function FinanceBarChart() {
       </svg>
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 mt-1">
-        {[['#a78bfa','2020'],['#fb923c','2021'],['#22d3ee','2022']].map(([c,l]) => (
+        {[['#a78bfa', '2020'], ['#fb923c', '2021'], ['#22d3ee', '2022']].map(([c, l]) => (
           <span key={l} className="flex items-center gap-1.5 text-xs text-gray-500">
             <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: c }} />
             {l}
@@ -196,9 +196,35 @@ function DonutChart({ centerLabel }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function Finance() {
-  const navigate              = useNavigate()
+  const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState('Finance')
-  const [search, setSearch]         = useState('')
+  const [search, setSearch] = useState('')
+
+  // ── Shared store — real bills, same data Pharmacy/Receptionist write to ──
+  const { bills } = useBills()
+  const patients = usePatients()
+
+  const totalRevenue = bills.filter(b => b.status === "Paid").reduce((sum, b) => sum + (b.net || 0), 0)
+  const pendingAmount = bills.filter(b => b.status !== "Paid").reduce((sum, b) => sum + (b.net || 0), 0)
+  const insuranceRevenue = bills.filter(b => b.mode === "Insurance").reduce((sum, b) => sum + (b.net || 0), 0)
+  const grossRevenue = bills.reduce((sum, b) => sum + (b.gross || 0), 0)
+
+  const statCards = [
+    { value: `₹${totalRevenue.toLocaleString('en-IN')}`, label: 'Total Collected', sub: `${bills.filter(b => b.status === "Paid").length} bills paid`, variant: 'green' },
+    { value: `₹${pendingAmount.toLocaleString('en-IN')}`, label: 'Pending Collection', sub: `${bills.filter(b => b.status !== "Paid").length} bills outstanding`, variant: 'red' },
+    { value: `₹${insuranceRevenue.toLocaleString('en-IN')}`, label: 'Insurance Claims', sub: `${bills.filter(b => b.mode === "Insurance").length} claims`, variant: 'blue' },
+    { value: `₹${grossRevenue.toLocaleString('en-IN')}`, label: 'Gross Billed', sub: `${bills.length} bills total`, variant: 'green' },
+  ]
+
+  // Real transactions, most recent first (bills are prepended on creation,
+  // so the array order already reflects recency)
+  const transactions = bills.map(b => ({
+    title: `${b.mode} payment — ${patients.find(p => p.id === b.patientId)?.name || b.patientId}`,
+    type: 'Revenue',
+    billId: b.billId,
+    amount: `+₹${b.net}`,
+    status: b.status,
+  }))
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -209,11 +235,11 @@ function Finance() {
         onLinkClick={(link) => {
           setActiveLink(link)
           if (link === 'Dashboard') navigate('/admin')
-          if (link === 'Doctors')   navigate('/admin/doctors')
-          if (link === 'Staff')     navigate('/admin/staff')
-          if (link === 'IP')        navigate('/admin/ip')
-          if (link === 'Vehicles')  navigate('/admin/vehicles')
-          if (link === 'Finance')   navigate('/admin/finance')
+          if (link === 'Doctors') navigate('/admin/doctors')
+          if (link === 'Staff') navigate('/admin/staff')
+          if (link === 'IP') navigate('/admin/ip')
+          if (link === 'Vehicles') navigate('/admin/vehicles')
+          if (link === 'Finance') navigate('/admin/finance')
         }}
       />
 
@@ -243,7 +269,7 @@ function Finance() {
 
           {/* Stat cards */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            {STAT_CARDS.map((c, i) => (
+            {statCards.map((c, i) => (
               <FinanceStatCard key={i} {...c} />
             ))}
           </div>
@@ -271,35 +297,32 @@ function Finance() {
             </div>
           </div>
 
-          {/* Recent transactions */}
+        {/* Recent transactions — real bills, not mock */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
             <h3 className="font-semibold text-gray-700 mb-4">Recent Transactions</h3>
             <div className="flex flex-col gap-4">
-              {TRANSACTIONS.map((t, i) => (
+              {transactions.map((t, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center
-                                     text-sm font-bold shrink-0
-                                     ${t.type === 'Revenue'
-                                       ? 'bg-green-100 text-green-600'
-                                       : 'bg-red-100 text-red-500'}`}>
-                      {t.type === 'Revenue' ? '+' : '−'}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center
+                                     text-sm font-bold shrink-0 bg-green-100 text-green-600">
+                      +
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-700">{t.title}</p>
-                      <p className="text-xs text-gray-400">{t.type} · {t.date}</p>
+                      <p className="text-xs text-gray-400">{t.billId} · {t.status}</p>
                     </div>
                   </div>
-                  <span className={`text-sm font-semibold ${
-                    t.type === 'Revenue' ? 'text-green-600' : 'text-red-500'
-                  }`}>
+                  <span className="text-sm font-semibold text-green-600">
                     {t.amount}
                   </span>
                 </div>
               ))}
+              {transactions.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">No transactions yet</p>
+              )}
             </div>
           </div>
-
         </main>
       </div>
     </div>
