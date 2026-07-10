@@ -52,6 +52,9 @@ import Finance from './pages/admin/Finance'
 import FollowUps from './pages/admin/FollowUps'
 import Reports from './pages/admin/Reports'
 
+//ip manager pages
+import IPManager from './pages/ip/IPManager'
+
 function App() {
   return (
     <BrowserRouter>
@@ -223,6 +226,93 @@ function App() {
             <ReportsManagement />
           </ProtectedRoute>
         }/>
+        <Route path="/ip" element={
+        <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+        </ProtectedRoute>
+    }
+/>
+{/* Admin module */}
+<Route
+  path="/admin"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <AdminDashboard />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/ip"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <IPManagement />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/doctors"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <Doctors />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/staff"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <Staff />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/vehicles"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <Vehicles />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/add-vehicle"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <AddVehicle />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/finance"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <Finance />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/followups"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <FollowUps />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin/reports"
+  element={
+    <ProtectedRoute allowedRole="admin">
+      <Reports />
+    </ProtectedRoute>
+  }
+/>
 
       </Routes>
     </BrowserRouter>

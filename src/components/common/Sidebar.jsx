@@ -45,6 +45,11 @@ const NAV_ICONS = {
 "Finance":       "💰",
 "Follow-ups":    "📞",
 "Reports":       "📊",
+// IP Manager
+"Admissions": "📥",
+"Current Patients": "🛏️",
+"Bed Management": "🏥",
+"Discharge": "📄",
 }
 
 const ROLE_LABELS = {
@@ -53,6 +58,7 @@ const ROLE_LABELS = {
   nurse: "Nurse",
   lab: "Lab Technician",
   pharmacy: "Pharmacist",
+  ipmanager: "IP Manager",
 }
 
 const ROLE_COLORS = {
@@ -61,6 +67,7 @@ const ROLE_COLORS = {
   nurse:        "bg-green-500",
   lab:          "bg-yellow-500",
   pharmacy:     "bg-orange-500",
+  ipmanager:    "bg-red-500",
 }
 
 function Sidebar({ links, activeLink, onLinkClick }) {
