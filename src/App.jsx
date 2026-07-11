@@ -36,7 +36,6 @@ import VitalsEntry from './pages/nurse/VitalsEntry'
 
 // Lab pages
 import LabDashboard from './pages/lab/LabDashboard'
-import TestOrder from './pages/lab/TestOrder'
 import SampleCollection from './pages/lab/SampleCollection'
 import ResultEntry from './pages/lab/ResultEntry'
 import ReportsManagement from './pages/lab/ReportsManagement'
@@ -209,11 +208,6 @@ function App() {
         <Route path="/lab" element={
           <ProtectedRoute allowedRole="lab">
             <LabDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/lab/test-order" element={
-          <ProtectedRoute allowedRole="lab">
-            <TestOrder />
           </ProtectedRoute>
         } />
 

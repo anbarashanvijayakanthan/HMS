@@ -7,8 +7,6 @@ import { useLabOrders, usePatients } from '../../store/hospitalStore'
 
 const NAV_LINKS = [
   "Lab Dashboard",
-  "Test Order",
-  "Sample Collection",
   "Result Entry",
   "Reports Management",
 ]
@@ -26,6 +24,10 @@ const STATUS_STYLES = {
   Completed:         "bg-green-100 text-green-700",
 }
 
+const STATUS_FILTERS = ["All", "Pending", "Processing", "Sample Collected", "Completed"]
+const STATUS_ORDER = ["Pending", "Processing", "Sample Collected", "Completed"]
+const PRIORITY_FILTERS = ["All", "STAT", "Urgent", "Routine"]
+
 function PriorityBadge({ priority }) {
   return (
     <span className={`px-2 py-1 rounded-full text-xs ${PRIORITY_STYLES[priority] || "bg-gray-100 text-gray-600"}`}>
@@ -42,14 +44,64 @@ function LabStatusBadge({ status }) {
   )
 }
 
+function OrderViewModal({ order, onClose }) {
+  if (!order) return null
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800 text-lg">Order {order.orderId}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <div className="flex flex-col gap-2 text-sm mb-4">
+          <div className="flex justify-between border-b border-gray-50 pb-2">
+            <span className="text-gray-400">Patient</span>
+            <span className="font-medium text-gray-800">{order.patientName}</span>
+          </div>
+          <div className="flex justify-between border-b border-gray-50 pb-2">
+            <span className="text-gray-400">Doctor</span>
+            <span className="font-medium text-gray-800">{order.doctor}</span>
+          </div>
+          <div className="flex justify-between border-b border-gray-50 pb-2">
+            <span className="text-gray-400">Priority</span>
+            <PriorityBadge priority={order.priority} />
+          </div>
+          <div className="flex justify-between border-b border-gray-50 pb-2">
+            <span className="text-gray-400">Ordered</span>
+            <span className="font-medium text-gray-800">{order.ordered}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Status</span>
+            <LabStatusBadge status={order.status} />
+          </div>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-2">Tests Ordered</p>
+          <div className="flex flex-col gap-1.5">
+            {order.tests.map(t => (
+              <div key={t.name} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                <span className="text-sm text-gray-700">{t.name}</span>
+                <span className="text-xs text-gray-400">{t.priority}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LabDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Lab Dashboard")
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [priorityFilter, setPriorityFilter] = useState('All')
+  const [showFilter, setShowFilter] = useState(false)
+  const [viewOrder, setViewOrder] = useState(null)
 
-  // ── Shared store ──
-  const { labOrders } = useLabOrders()
+  const { labOrders, updateStatus } = useLabOrders()
   const patients = usePatients()
 
   const enriched = labOrders.map(o => ({
@@ -58,11 +110,23 @@ function LabDashboard() {
     testsText: o.tests.map(t => t.name).join(', '),
   }))
 
-  const pendingOrders = enriched.filter(o => o.status !== "Completed")
-  const filtered = pendingOrders.filter(o =>
-    o.patientName.toLowerCase().includes(search.toLowerCase()) ||
-    o.orderId.toLowerCase().includes(search.toLowerCase()) ||
-    o.testsText.toLowerCase().includes(search.toLowerCase())
+  const filteredOrders = enriched.filter(o => {
+    const q = search.trim().toLowerCase()
+    const matchSearch = !q ||
+      o.patientName.toLowerCase().includes(q) ||
+      o.orderId.toLowerCase().includes(q) ||
+      o.testsText.toLowerCase().includes(q) ||
+      (o.doctor || '').toLowerCase().includes(q) ||
+      o.priority.toLowerCase().includes(q) ||
+      o.status.toLowerCase().includes(q)
+    const matchStatus = statusFilter === "All" || o.status === statusFilter
+    const matchPriority = priorityFilter === "All" || o.priority === priorityFilter
+    return matchSearch && matchStatus && matchPriority
+  })
+
+  // Completed orders always sink to the bottom
+  const sortedOrders = [...filteredOrders].sort(
+    (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
   )
 
   const statAlerts = enriched.filter(o => o.priority === "STAT" && o.status !== "Completed")
@@ -70,8 +134,6 @@ function LabDashboard() {
   const handleNavClick = (link) => {
     setActiveLink(link)
     if (link === "Lab Dashboard")       navigate('/lab')
-    if (link === "Test Order")          navigate('/lab/test-order')
-    if (link === "Sample Collection")   navigate('/lab/sample-collection')
     if (link === "Result Entry")        navigate('/lab/result-entry')
     if (link === "Reports Management")  navigate('/lab/reports')
   }
@@ -79,15 +141,10 @@ function LabDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      <Sidebar
-        links={NAV_LINKS}
-        activeLink={activeLink}
-        onLinkClick={handleNavClick}
-      />
+      <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
 
       <main className="flex-1 p-6 overflow-auto">
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Laboratory Dashboard</h2>
@@ -97,38 +154,75 @@ function LabDashboard() {
           </div>
         </div>
 
-        {/* Stats Row — derived from the store */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatsCard icon="🧪" label="Total Orders"      value={labOrders.length} />
-          <StatsCard icon="⏳" label="Pending"            value={labOrders.filter(o => o.status === "Pending").length} />
-          <StatsCard icon="✅" label="Completed"          value={labOrders.filter(o => o.status === "Completed").length} />
-          <StatsCard icon="⚠️" label="STAT Orders"        value={statAlerts.length} subColor="text-red-500" />
+        <div className="grid grid-cols-5 gap-4 mb-6">
+          <StatsCard icon="🧪" label="Total Orders"  value={labOrders.length} />
+          <StatsCard icon="⏳" label="Pending"        value={labOrders.filter(o => o.status === "Pending").length} />
+          <StatsCard icon="🔬" label="Processing"     value={labOrders.filter(o => o.status === "Processing").length} />
+          <StatsCard icon="✅" label="Completed"      value={labOrders.filter(o => o.status === "Completed").length} />
+          <StatsCard icon="⚠️" label="STAT Orders"    value={statAlerts.length} subColor="text-red-500" />
         </div>
 
-        {/* Pending Test Orders */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Pending Test Orders</h3>
+            <h3 className="font-semibold text-gray-700">All Test Orders</h3>
             <span className="bg-orange-100 text-orange-600 text-xs font-medium px-2.5 py-1 rounded-full">
-              {pendingOrders.length} Pending
+              {sortedOrders.length} Shown
             </span>
           </div>
 
-          {/* Search + Filter */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-4 relative">
             <input
               type="text"
-              placeholder="Search order, patient or test..."
+              placeholder="Search order, patient, test, doctor, priority..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50 transition">
-              ⚙ Filter
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowFilter(v => !v)}
+                className={`flex items-center gap-1.5 text-sm border px-3 py-2 rounded-lg transition ${
+                  priorityFilter !== "All"
+                    ? "border-blue-400 text-blue-600 bg-blue-50"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                ⚙ Filter{priorityFilter !== "All" ? `: ${priorityFilter}` : ""}
+              </button>
+              {showFilter && (
+                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+                  {PRIORITY_FILTERS.map(f => (
+                    <button
+                      key={f}
+                      onClick={() => { setPriorityFilter(f); setShowFilter(false) }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                        priorityFilter === f ? "text-blue-600 font-medium" : "text-gray-600"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Table */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition font-medium ${
+                  statusFilter === f
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -140,27 +234,53 @@ function LabDashboard() {
                   <th className="pb-3 font-medium">Priority</th>
                   <th className="pb-3 font-medium">Ordered</th>
                   <th className="pb-3 font-medium">Status</th>
+                  <th className="pb-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(order => (
-                  <tr
-                    key={order.orderId}
-                    className="border-b border-gray-50 hover:bg-gray-50 transition"
-                  >
+                {sortedOrders.map(order => (
+                  <tr key={order.orderId} className="border-b border-gray-50 hover:bg-gray-50 transition">
                     <td className="py-3 font-mono text-xs text-gray-500">{order.orderId}</td>
                     <td className="py-3 font-medium text-gray-800">{order.patientName}</td>
                     <td className="py-3 text-gray-500">{order.doctor}</td>
                     <td className="py-3 text-gray-600 max-w-48 truncate">{order.testsText}</td>
                     <td className="py-3"><PriorityBadge priority={order.priority} /></td>
                     <td className="py-3 text-gray-500">{order.ordered}</td>
-                    <td className="py-3"><LabStatusBadge status={order.status} /></td>
+                    <td className="py-3">
+                      <select
+                        value={order.status}
+                        onChange={e => updateStatus(order.orderId, e.target.value)}
+                        className="text-xs font-medium border-0 bg-transparent cursor-pointer focus:outline-none"
+                      >
+                        {STATUS_FILTERS.filter(f => f !== "All").map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setViewOrder(order)}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          View
+                        </button>
+                        {order.status === "Pending" && (
+                          <button
+                            onClick={() => navigate(`/lab/sample-collection/${order.orderId}`)}
+                            className="text-xs bg-gray-800 text-white px-2.5 py-1 rounded-lg hover:bg-gray-700 transition"
+                          >
+                            Collect
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {sortedOrders.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-gray-400 text-sm">
-                      No pending orders
+                    <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                      No orders match your search/filter
                     </td>
                   </tr>
                 )}
@@ -169,7 +289,6 @@ function LabDashboard() {
           </div>
         </div>
 
-        {/* STAT / Urgent Alerts */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-xl">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-orange-500">⚠</span>
@@ -177,10 +296,7 @@ function LabDashboard() {
           </div>
           <div className="flex flex-col gap-3">
             {statAlerts.map((alert) => (
-              <div
-                key={alert.orderId}
-                className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3 flex items-center justify-between"
-              >
+              <div key={alert.orderId} className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{alert.patientName}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{alert.testsText}</p>
@@ -198,6 +314,8 @@ function LabDashboard() {
         </div>
 
       </main>
+
+      <OrderViewModal order={viewOrder} onClose={() => setViewOrder(null)} />
     </div>
   )
 }

@@ -6,14 +6,10 @@ import { useLabOrders, usePatients, useLabResults } from '../../store/hospitalSt
 
 const NAV_LINKS = [
   "Lab Dashboard",
-  "Test Order",
-  "Sample Collection",
   "Result Entry",
   "Reports Management",
 ]
 
-// Parameter templates — these are lab-config (what fields a given test
-// needs), not patient data, so they stay local rather than in the store.
 const TEST_PARAM_TEMPLATES = {
   "Complete Blood Count (CBC)": [
     { id: "hb",   name: "Haemoglobin (Hb)", unit: "g/dL", ref: "12.8–16.8 (F)", defaultValue: "" },
@@ -32,18 +28,18 @@ const TEST_PARAM_TEMPLATES = {
     { id: "trop", name: "Troponin I (hs)", unit: "ng/L", ref: "< 14 (F)", defaultValue: "" },
   ],
 }
-// Any test not listed above gets one generic result field.
 const GENERIC_PARAM = (testName) => ([
   { id: "value", name: testName, unit: "", ref: "—", defaultValue: "" },
 ])
 
-function FlagPicker({ value, onChange }) {
+function FlagPicker({ value, onChange, disabled }) {
   const opts = ["", "L", "H"]
   return (
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+      disabled={disabled}
+      className="w-14 border border-gray-200 rounded px-1 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
     >
       {opts.map(o => <option key={o} value={o}>{o || "—"}</option>)}
     </select>
@@ -56,28 +52,24 @@ function ResultEntry() {
   const navigate = useNavigate()
   const [activeLink, setActiveLink] = useState("Result Entry")
 
-  // ── Shared store ──
   const { labOrders } = useLabOrders()
   const patients = usePatients()
   const { saveResult } = useLabResults()
 
-  // Prefer a specific order from the URL; otherwise grab the first order
-  // that's ready for results (sample collected but not yet completed).
-const order = orderId ? labOrders.find(o => o.orderId === orderId) : null
-  // values keyed by `${testName}::${paramId}` -> { value, flag }
+  const order = orderId ? labOrders.find(o => o.orderId === orderId) : null
   const [values, setValues] = useState({})
   const [saved, setSaved] = useState(false)
+  const [editing, setEditing] = useState(true) // unlocked while filling in / re-editing
+  const [attemptedSave, setAttemptedSave] = useState(false)
 
   const handleNavClick = (link) => {
-    setActiveLink(link)
-    if (link === "Lab Dashboard")       navigate('/lab')
-    if (link === "Test Order")          navigate('/lab/test-order')
-    if (link === "Sample Collection")   navigate('/lab/sample-collection')
-    if (link === "Reports Management")  navigate('/lab/reports')
-    if (link === "Result Entry")        navigate('/lab/result-entry')
-  }
+  setActiveLink(link)
+  if (link === "Lab Dashboard")       navigate('/lab')
+  if (link === "Reports Management")  navigate('/lab/reports')
+  if (link === "Result Entry")        navigate('/lab/result-entry')
+}
 
-if (!orderId) {
+  if (!orderId) {
     const ready = labOrders.filter(o => o.status === "Sample Collected")
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -132,13 +124,33 @@ if (!orderId) {
       <div className="min-h-screen bg-gray-50 flex">
         <Sidebar links={NAV_LINKS} activeLink={activeLink} onLinkClick={handleNavClick} />
         <main className="flex-1 p-6">
-          <p className="text-gray-500">No order found for that ID.</p>
+          <p className="text-gray-500 mb-3">No order found for that ID.</p>
+          <button
+            onClick={() => navigate('/lab/result-entry')}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            ← Back to Result Entry list
+          </button>
         </main>
       </div>
     )
   }
 
   const patient = patients.find(p => p.id === order.patientId)
+
+  // Flatten every parameter across every test on this order — used both
+  // to render the form and to check whether anything has actually been entered.
+  const allParams = order.tests.flatMap(t => {
+    const params = TEST_PARAM_TEMPLATES[t.name] || GENERIC_PARAM(t.name)
+    return params.map(p => ({ testName: t.name, ...p }))
+  })
+
+  const filledCount = allParams.filter(p => {
+    const key = `${p.testName}::${p.id}`
+    return (values[key]?.value || '').trim() !== ''
+  }).length
+
+  const canSave = filledCount > 0
 
   const setParamValue = (testName, paramId, field, val) => {
     const key = `${testName}::${paramId}`
@@ -150,7 +162,9 @@ if (!orderId) {
   }
 
   const handleSave = () => {
-    // Compile everything entered into one result record
+    setAttemptedSave(true)
+    if (!canSave) return
+
     const entries = []
     order.tests.forEach(t => {
       const params = TEST_PARAM_TEMPLATES[t.name] || GENERIC_PARAM(t.name)
@@ -174,6 +188,8 @@ if (!orderId) {
       delivery: "Pending",
     })
     setSaved(true)
+    setEditing(false) // lock the form after a successful save
+    setAttemptedSave(false)
   }
 
   return (
@@ -185,28 +201,50 @@ if (!orderId) {
 
         {/* Breadcrumb */}
         <div className="text-xs text-gray-400 mb-4">
-          <span>Lab Technician</span>
+          <span className="cursor-pointer hover:text-blue-500" onClick={() => navigate('/lab/result-entry')}>
+            Lab Technician
+          </span>
           <span className="mx-1.5">›</span>
           <span className="text-gray-600 font-medium">Result Entry</span>
         </div>
 
         {/* Page Title */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Result Entry</h2>
-          <p className="text-sm text-gray-400">
-            {order.orderId} · {patient?.name || order.patientId} · {order.tests.map(t => t.name).join(' + ')}
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Result Entry</h2>
+            <p className="text-sm text-gray-400">
+              {order.orderId} · {patient?.name || order.patientId} · {order.tests.map(t => t.name).join(' + ')}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/lab/result-entry')}
+            className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
+          >
+            ← Back to list
+          </button>
         </div>
 
-        {saved && (
-          <p className="text-sm text-green-600 bg-green-50 border border-green-100 rounded-lg px-4 py-2.5 mb-5">
-            ✓ Results saved. Order status updated to "Completed".
+        {saved && !editing && (
+          <div className="flex items-center justify-between text-sm text-green-600 bg-green-50 border border-green-100 rounded-lg px-4 py-2.5 mb-5">
+            <span>✓ Results saved. Order status updated to "Completed".</span>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs font-medium text-green-700 hover:underline"
+            >
+              Edit results
+            </button>
+          </div>
+        )}
+
+        {attemptedSave && !canSave && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2.5 mb-5">
+            Enter at least one result value before saving.
           </p>
         )}
 
         <div className="flex gap-5">
 
-          {/* Left Column — Test Tables, one per test on this order */}
+          {/* Left Column — Test Tables */}
           <div className="flex-1 flex flex-col gap-5 min-w-0">
             {order.tests.map(t => {
               const params = TEST_PARAM_TEMPLATES[t.name] || GENERIC_PARAM(t.name)
@@ -241,13 +279,18 @@ if (!orderId) {
                                   value={current.value}
                                   onChange={e => setParamValue(t.name, p.id, "value", e.target.value)}
                                   placeholder="Enter value"
-                                  className="w-24 border border-gray-200 rounded px-2 py-1 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={!editing}
+                                  className="w-24 border border-gray-200 rounded px-2 py-1 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
                                 />
                               </td>
                               <td className="py-3 text-gray-400 text-xs">{p.unit}</td>
                               <td className="py-3 text-gray-400 text-xs">{p.ref}</td>
                               <td className="py-3">
-                                <FlagPicker value={current.flag} onChange={v => setParamValue(t.name, p.id, "flag", v)} />
+                                <FlagPicker
+                                  value={current.flag}
+                                  onChange={v => setParamValue(t.name, p.id, "flag", v)}
+                                  disabled={!editing}
+                                />
                               </td>
                             </tr>
                           )
@@ -263,7 +306,6 @@ if (!orderId) {
           {/* Right Column */}
           <div className="w-72 shrink-0 flex flex-col gap-5">
 
-            {/* Patient & Order Info — real data now */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <h3 className="font-semibold text-gray-700 mb-3">Patient & Order Info</h3>
               <div className="flex flex-col gap-2.5 text-sm">
@@ -284,7 +326,6 @@ if (!orderId) {
               </div>
             </div>
 
-            {/* Note on flags */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-orange-500">⚠</span>
@@ -297,13 +338,22 @@ if (!orderId) {
               </p>
             </div>
 
-            {/* Save Button */}
             <button
               onClick={handleSave}
-              className="w-full bg-gray-800 text-white py-3 rounded-xl text-sm font-semibold hover:bg-gray-700 transition"
+              disabled={!editing}
+              className={`w-full py-3 rounded-xl text-sm font-semibold transition ${
+                editing
+                  ? 'bg-gray-800 text-white hover:bg-gray-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              Save Results
+              {saved ? 'Save Changes' : 'Save Results'}
             </button>
+            {!canSave && editing && (
+              <p className="text-xs text-gray-400 text-center -mt-3">
+                {filledCount === 0 ? 'Enter at least one value to save' : ''}
+              </p>
+            )}
 
           </div>
         </div>
