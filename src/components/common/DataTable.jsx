@@ -52,8 +52,11 @@ function DataTable({ columns, rows, onAction }) {
                     </span>
                   )}
 
+                  {/* Custom cell renderer */}
+                  {col.render && col.render(row, col)}
+
                   {/* Default plain text */}
-                  {!col.type && (
+                  {!col.type && !col.render && (
                     <span className="text-gray-600">{row[col.key]}</span>
                   )}
 

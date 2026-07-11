@@ -311,7 +311,7 @@ function getTodayLabel() {
   });
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onQuickActionSelect }) {
   const [alerts, setAlerts] = useState(initialAlerts);
   const [activeAction, setActiveAction] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
@@ -328,6 +328,7 @@ export default function Dashboard() {
   const handleQuickAction = (action) => {
     setActiveAction(action.id);
     setActionMessage(action.message);
+    onQuickActionSelect?.(action.id);
   };
 
   const dismissAlert = (id) => {

@@ -171,6 +171,8 @@ export default function Admissions() {
   const [wardFilter, setWardFilter] = useState("All");
   const [viewRow, setViewRow] = useState(null);
   const [toast, setToast] = useState(null);
+  const [assignmentPicker, setAssignmentPicker] = useState(null);
+  const [assignmentValue, setAssignmentValue] = useState("");
 
   useEffect(() => {
     if (!toast) return;
@@ -193,24 +195,38 @@ export default function Admissions() {
     );
   };
 
+  const openAssignmentPicker = (row, kind) => {
+    const existingValue = kind === "room" ? row.room : row.doctor;
+    setAssignmentPicker({ rowId: row.id, kind });
+    setAssignmentValue(existingValue || "");
+  };
+
+  const confirmAssignment = () => {
+    if (!assignmentPicker || !assignmentValue) return;
+
+    if (assignmentPicker.kind === "room") {
+      updateAdmission(assignmentPicker.rowId, { room: assignmentValue });
+      setToast(`Room ${assignmentValue} assigned`);
+    } else {
+      updateAdmission(assignmentPicker.rowId, { doctor: assignmentValue });
+      setToast(`${assignmentValue} assigned`);
+    }
+
+    setAssignmentPicker(null);
+    setAssignmentValue("");
+  };
+
   const handleAction = (row, key) => {
     switch (key) {
       case "view":
         setViewRow(row);
         break;
-      case "assignBed": {
-        const nextRoom = ROOM_POOL[Math.floor(Math.random() * ROOM_POOL.length)];
-        updateAdmission(row.id, { room: nextRoom });
-        setToast(`Room ${nextRoom} assigned to ${row.patient}`);
+      case "assignBed":
+        openAssignmentPicker(row, "room");
         break;
-      }
-      case "assignDoctor": {
-        const currentIndex = DOCTORS.indexOf(row.doctor);
-        const nextDoctor = DOCTORS[(currentIndex + 1) % DOCTORS.length];
-        updateAdmission(row.id, { doctor: nextDoctor });
-        setToast(`${nextDoctor} assigned to ${row.patient}`);
+      case "assignDoctor":
+        openAssignmentPicker(row, "doctor");
         break;
-      }
       case "approve":
         if (row.status === "Admitted") {
           setToast(`${row.patient} is already admitted`);
@@ -227,6 +243,108 @@ export default function Admissions() {
         break;
     }
   };
+
+  const getRoomOptions = (row) => {
+    const usedRooms = admissions
+      .filter((admission) => admission.id !== row.id && admission.room !== "Unassigned")
+      .map((admission) => admission.room);
+
+    const options = [row.room, ...ROOM_POOL.filter((room) => !usedRooms.includes(room))];
+    return [...new Set(options.filter(Boolean))];
+  };
+
+  const getDoctorOptions = (row) => {
+    const options = [row.doctor, ...DOCTORS.filter((doctor) => doctor !== row.doctor)];
+    return [...new Set(options.filter(Boolean))];
+  };
+
+  const columnsWithRender = admissionColumns.map((column) => {
+    if (column.key === "room") {
+      return {
+        ...column,
+        render: (row) => {
+          const isActive = assignmentPicker?.rowId === row.id && assignmentPicker?.kind === "room";
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openAssignmentPicker(row, "room")}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-left text-sm text-gray-700 hover:border-blue-300 hover:text-blue-600"
+              >
+                {row.room || "Select room"}
+              </button>
+              {isActive && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={assignmentValue}
+                    onChange={(e) => setAssignmentValue(e.target.value)}
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
+                  >
+                    {getRoomOptions(row).map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={confirmAssignment}
+                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        },
+      };
+    }
+
+    if (column.key === "doctor") {
+      return {
+        ...column,
+        render: (row) => {
+          const isActive = assignmentPicker?.rowId === row.id && assignmentPicker?.kind === "doctor";
+          return (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openAssignmentPicker(row, "doctor")}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-left text-sm text-gray-700 hover:border-blue-300 hover:text-blue-600"
+              >
+                {row.doctor || "Select doctor"}
+              </button>
+              {isActive && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={assignmentValue}
+                    onChange={(e) => setAssignmentValue(e.target.value)}
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
+                  >
+                    {getDoctorOptions(row).map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={confirmAssignment}
+                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        },
+      };
+    }
+
+    return column;
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,7 +401,7 @@ export default function Admissions() {
           <h3 className="text-base font-semibold text-gray-800">Admission Requests</h3>
           <span className="text-xs text-gray-400">{filteredAdmissions.length} records</span>
         </div>
-        <DataTable columns={admissionColumns} rows={filteredAdmissions} onAction={handleAction} />
+        <DataTable columns={columnsWithRender} rows={filteredAdmissions} onAction={handleAction} />
       </div>
 
       {viewRow && (
