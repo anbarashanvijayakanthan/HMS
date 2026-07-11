@@ -47,8 +47,21 @@ const PAGE_META = {
 export default function IPManager() {
   const [activeLink, setActiveLink] = useState("Dashboard");
 
+  const handleQuickActionSelect = (actionId) => {
+    const actionToPage = {
+      "view-admissions": "Admissions",
+      "current-patients": "Current Patients",
+      "manage-beds": "Bed Management",
+      "pending-discharges": "Discharge",
+    };
+
+    if (actionToPage[actionId]) {
+      setActiveLink(actionToPage[actionId]);
+    }
+  };
+
   const pageComponents = {
-    Dashboard: <Dashboard />,
+    Dashboard: <Dashboard onQuickActionSelect={handleQuickActionSelect} />,
     Admissions: <Admissions />,
     "Current Patients": <CurrentPatients />,
     "Bed Management": <BedManagement />,
