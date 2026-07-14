@@ -70,6 +70,7 @@ function DoctorDashboard() {
   const { queue } = useQueue()
   const vitalsMap = useAllVitals()
   const { labResults } = useLabResults()
+  console.log('LAB RESULTS:', labResults)
   const patients = usePatients()
 
   const doctorQueue = queue.filter(v => DOCTOR_RELEVANT_STATUSES.includes(v.status))
@@ -93,6 +94,7 @@ function DoctorDashboard() {
   // Match the same "Dr. X" formatting LabOrder.jsx uses when it creates the order,
   // so reports actually match up with whoever ordered them.
   const doctorName = user?.name?.trim().startsWith('Dr.') ? user.name : `Dr. ${user?.name}`
+  console.log('LOOKING FOR DOCTOR NAME:', doctorName)
 
   const myReports = Object.entries(labResults)
     .map(([orderId, result]) => ({ reportId: orderId, ...result }))
