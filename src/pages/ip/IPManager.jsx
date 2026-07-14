@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/common/Sidebar";
 import Header from "../../components/common/Header";
 import Dashboard from "./Dashboard";
@@ -45,7 +46,36 @@ const PAGE_META = {
 };
 
 export default function IPManager() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeLink, setActiveLink] = useState("Dashboard");
+
+  const routeToLink = {
+    "/ip": "Dashboard",
+    "/ip/admissions": "Admissions",
+    "/ip/current-patients": "Current Patients",
+    "/ip/bed-management": "Bed Management",
+    "/ip/discharge": "Discharge",
+    "/ip/reports": "Reports",
+  };
+
+  const linkToRoute = {
+    Dashboard: "/ip",
+    Admissions: "/ip/admissions",
+    "Current Patients": "/ip/current-patients",
+    "Bed Management": "/ip/bed-management",
+    Discharge: "/ip/discharge",
+    Reports: "/ip/reports",
+  };
+
+  useEffect(() => {
+    setActiveLink(routeToLink[location.pathname] || "Dashboard");
+  }, [location.pathname]);
+
+  const handleLinkClick = (link) => {
+    setActiveLink(link);
+    navigate(linkToRoute[link] || "/ip");
+  };
 
   const handleQuickActionSelect = (actionId) => {
     const actionToPage = {
@@ -56,7 +86,9 @@ export default function IPManager() {
     };
 
     if (actionToPage[actionId]) {
-      setActiveLink(actionToPage[actionId]);
+      const nextLink = actionToPage[actionId];
+      setActiveLink(nextLink);
+      navigate(linkToRoute[nextLink] || "/ip");
     }
   };
 
@@ -76,7 +108,7 @@ export default function IPManager() {
       <Sidebar
         links={SIDEBAR_LINKS}
         activeLink={activeLink}
-        onLinkClick={setActiveLink}
+        onLinkClick={handleLinkClick}
       />
 
       <div className="flex flex-1 flex-col min-w-0">

@@ -238,12 +238,37 @@ function App() {
           </ProtectedRoute>
         }/>
         <Route path="/ip" element={
-        <ProtectedRoute allowedRole="ipmanager">
+          <ProtectedRoute allowedRole="ipmanager">
             <IPManager />
-        </ProtectedRoute>
-    }
-/>
-{/* Admin module */}
+          </ProtectedRoute>
+        } />
+        <Route path="/ip/admissions" element={
+          <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/ip/current-patients" element={
+          <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/ip/bed-management" element={
+          <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/ip/discharge" element={
+          <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/ip/reports" element={
+          <ProtectedRoute allowedRole="ipmanager">
+            <IPManager />
+          </ProtectedRoute>
+        } />
+
+        {/* Admin module */}
 <Route
   path="/admin"
   element={
