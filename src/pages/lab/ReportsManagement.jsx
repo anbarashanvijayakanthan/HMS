@@ -141,10 +141,14 @@ function ReportsManagement() {
   const pendingCount = reports.filter(r => r.delivery === "Pending").length
   const abnormalCount = reports.filter(r => r.abnormal).length
 
+  const [justSent, setJustSent] = useState(null) // reportId that was just sent, for inline confirmation
+
   const handleSend = (reportId) => {
-  updateDelivery(reportId, "Sent")
-  navigate('/doctor')
+    updateDelivery(reportId, "Sent")
+    setJustSent(reportId)
+    setTimeout(() => setJustSent(null), 3000) // confirmation fades after 3s
 }
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -251,10 +255,12 @@ function ReportsManagement() {
                             onClick={() => handleSend(r.reportId)}
                             className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition"
                           >
-                          ➤ Send
+                            ➤ Send
                           </button>
-                          ) : (
-                          <span className="text-xs text-green-600 font-medium">✓ Sent</span>
+                        ) : justSent === r.reportId ? (
+                            <span className="text-xs text-green-600 font-medium animate-pulse">✓ Sent to doctor</span>
+                        ) : (
+                            <span className="text-xs text-green-600 font-medium">✓ Sent</span>
                         )}
                       </div>
                     </td>
